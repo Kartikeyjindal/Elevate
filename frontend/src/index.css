@@ -1,0 +1,209 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: #f4f6f9;
+  color: #44475b;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Webkit scrollbar matching Groww */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f4f6f9;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Clean Groww Card overrides */
+.ant-card {
+  background: #ffffff !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
+  transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.ant-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05) !important;
+  border-color: #00d09c !important;
+}
+
+/* Custom Table overrides for Groww look */
+.ant-table {
+  background: #ffffff !important;
+  border-radius: 12px !important;
+}
+
+.ant-table-thead > tr > th {
+  background: #f8fafc !important;
+  color: #7c8099 !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+/* Search Bar container */
+.search-container {
+  max-width: 480px;
+  width: 100%;
+  margin-right: 24px;
+}
+
+/* Smooth fade-in */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-section {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ─── Groww-style Dark Theme Overrides ─── */
+body.dark {
+  background-color: #0b0f19 !important;
+  color: #f1f5f9 !important;
+}
+
+body.dark ::-webkit-scrollbar-track {
+  background: #0b0f19 !important;
+}
+
+body.dark ::-webkit-scrollbar-thumb {
+  background: #1f2937 !important;
+}
+
+body.dark ::-webkit-scrollbar-thumb:hover {
+  background: #374151 !important;
+}
+
+body.dark .ant-card {
+  background: #121620 !important; /* Groww dark card background */
+  border: 1px solid #1f2937 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+body.dark .ant-card:hover {
+  border-color: #00d09c !important;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3) !important;
+}
+
+body.dark .ant-table {
+  background: #121620 !important;
+}
+
+body.dark .ant-table-thead > tr > th {
+  background: #171c26 !important;
+  color: #8f96a3 !important;
+  border-bottom: 1px solid #1f2937 !important;
+}
+
+body.dark .ant-table-tbody > tr > td {
+  border-bottom: 1px solid #1f2937 !important;
+  color: #f1f5f9 !important;
+}
+
+body.dark .ant-table-placeholder .ant-empty-normal {
+  color: #8f96a3 !important;
+}
+
+/* Tabs & input styling overrides for dark mode */
+body.dark .ant-tabs-nav {
+  border-bottom: 1px solid #1f2937 !important;
+}
+
+body.dark .ant-select-selector, 
+body.dark .ant-input, 
+body.dark .ant-input-number {
+  background-color: #121620 !important;
+  border-color: #1f2937 !important;
+  color: #f1f5f9 !important;
+}
+
+body.dark .ant-select-arrow {
+  color: #8f96a3 !important;
+}
+
+body.dark .ant-select-dropdown {
+  background-color: #121620 !important;
+  border: 1px solid #1f2937 !important;
+}
+
+body.dark .ant-select-item {
+  color: #f1f5f9 !important;
+}
+
+body.dark .ant-select-item-option-selected {
+  background-color: #1f2937 !important;
+}
+
+body.dark .ant-select-item-option-active {
+  background-color: #171c26 !important;
+}
+
+/* Form labels and text overrides for dark mode */
+body.dark span[style*="color: #44475b"],
+body.dark span[style*="color:#44475b"],
+body.dark span[style*="color: rgb(68, 71, 91)"],
+body.dark span[style*="color:rgb(68,71,91)"] {
+  color: #f1f5f9 !important;
+}
+
+body.dark [style*="color: #1a1d2e"],
+body.dark [style*="color:#1a1d2e"],
+body.dark [style*="color: rgb(26, 29, 46)"],
+body.dark [style*="color:rgb(26,29,46)"] {
+  color: #f1f5f9 !important;
+}
+
+body.dark .ant-form-item-label > label {
+  color: #f1f5f9 !important;
+}
+
+/* Background overrides for white panels/divs in dark mode */
+body.dark [style*="background: #ffffff"],
+body.dark [style*="background:#ffffff"],
+body.dark [style*="background-color: #ffffff"],
+body.dark [style*="background-color:#ffffff"],
+body.dark [style*="background: #fff"],
+body.dark [style*="background:#fff"],
+body.dark [style*="background-color: #fff"],
+body.dark [style*="background-color:#fff"] {
+  background-color: #121620 !important;
+}
+
+body.dark [style*="background: rgb(255, 255, 255)"],
+body.dark [style*="background-color: rgb(255, 255, 255)"] {
+  background-color: #121620 !important;
+}
+
+body.dark [style*="border: 1px solid #e5e8f0"],
+body.dark [style*="border: 1px solid #edf2f7"],
+body.dark [style*="border:1px solid #edf2f7"] {
+  border: 1px solid #1f2937 !important;
+}
+
+
+
