@@ -793,6 +793,32 @@ export default function InvestorDashboard() {
       render: (amount) => <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{amount.toLocaleString()}</Text>
     },
     {
+      title: 'Valuation History',
+      key: 'valuationHistory',
+      render: (_, record) => {
+        const valuations = record.startupObj?.pastValuations;
+        if (!valuations || valuations.length < 2) {
+          return <Text style={{ color: '#7c8099', fontSize: 12 }}>No history</Text>;
+        }
+        const latest = valuations[valuations.length - 1];
+        const first = valuations[0];
+        const pct = first > 0 ? (((latest - first) / first) * 100).toFixed(1) : 0;
+        const isUp = latest >= first;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Sparkline data={valuations} />
+            <div>
+              <Text style={{ color: isUp ? '#00d09c' : '#eb5757', fontWeight: 700, fontSize: 12 }}>
+                {isUp ? '▲' : '▼'} {Math.abs(pct)}%
+              </Text>
+              <br />
+              <Text style={{ color: '#7c8099', fontSize: 11 }}>₹{(latest / 10000000).toFixed(2)}Cr</Text>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
       title: 'Investment Date',
       dataIndex: 'timestamp',
       key: 'timestamp',
@@ -1196,7 +1222,7 @@ export default function InvestorDashboard() {
                   </Row>
 
                   <Card>
-                    <Title level={4} style={{ color: '#44475b', marginBottom: 20, fontFamily: 'Outfit', fontWeight: 700 }}>Investment Ledger</Title>
+                    <Title level={4} style={{ color: isDarkMode ? '#f1f5f9' : '#44475b', marginBottom: 20, fontFamily: 'Outfit', fontWeight: 700 }}>Investment Ledger &amp; Valuation History</Title>
                     <Table 
                       dataSource={myInvestments} 
                       columns={portfolioColumns} 
@@ -1204,7 +1230,37 @@ export default function InvestorDashboard() {
                       locale={{ emptyText: <span style={{ color: '#7c8099' }}>No holdings recorded. Go to Marketplace to invest.</span> }}
                       style={{ background: 'transparent' }}
                       rowClassName={() => 'portfolio-row'}
+                      scroll={{ x: true }}
                     />
+                  </Card>
+
+                  {/* Founder CTA */}
+                  <Card 
+                    style={{ 
+                      marginTop: 24, 
+                      background: isDarkMode ? 'linear-gradient(135deg, #064e3b 0%, #0d2d2e 100%)' : 'linear-gradient(135deg, #e6fffa 0%, #f0fdf9 100%)',
+                      border: `1px solid ${isDarkMode ? '#065f46' : '#a7f3d0'}`,
+                      borderRadius: 16
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                      <div>
+                        <Title level={4} style={{ color: isDarkMode ? '#6ee7b7' : '#065f46', margin: 0, fontFamily: 'Outfit', fontWeight: 700 }}>
+                          🚀 Are You a Startup Founder?
+                        </Title>
+                        <Text style={{ color: isDarkMode ? '#a7f3d0' : '#047857', fontSize: 14 }}>
+                          List your startup on Elevate and raise capital from thousands of retail investors.
+                        </Text>
+                      </div>
+                      <Button 
+                        type="primary" 
+                        size="large"
+                        style={{ background: '#00d09c', borderColor: '#00d09c', fontWeight: 700, borderRadius: 8 }}
+                        onClick={() => navigate('/register?type=company')}
+                      >
+                        Register as Founder →
+                      </Button>
+                    </div>
                   </Card>
                 </div>
               )

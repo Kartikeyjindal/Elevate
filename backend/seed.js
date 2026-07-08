@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const User = require('./models/user');
 const Startup = require('./models/startup');
 const Investment = require('./models/investment');
+const Blog = require('./models/blog');
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crowdfunding';
 
@@ -17,6 +18,7 @@ async function seedDatabase() {
     await User.deleteMany({});
     await Startup.deleteMany({});
     await Investment.deleteMany({});
+    await Blog.deleteMany({});
     console.log('Database cleared.');
 
     // 1. Seed Admin
@@ -758,6 +760,46 @@ async function seedDatabase() {
       await startup.save();
     }
     console.log('Seeded 2 pending startups.');
+
+    // 5. Seed Expert Analyst Blogs
+    const expertBlogs = [
+      {
+        title: 'Why Early-Stage Crowdfunding Beats Traditional VC for Indian Startups',
+        content: 'The venture capital ecosystem in India has long favoured late-stage bets, leaving a massive funding gap for seed and pre-Series A founders. Crowdfunding platforms like Elevate bridge that gap by democratising access to capital and allowing retail investors to participate in high-growth opportunities previously reserved for institutional players.\n\nKey insights: 1) Crowdfunding rounds close 3x faster than traditional VC in India. 2) Retail investor participation increases startup visibility and creates early adopter communities. 3) SEBI's new framework for alternative investment funds (AIFs) is making it easier for platforms like Elevate to operate in compliance.',
+        author: 'Elevate Research Team',
+        timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      },
+      {
+        title: 'Top 5 Sectors to Watch in India's Startup Ecosystem — H2 2026',
+        content: 'As we enter the second half of 2026, our analysts have identified five sectors poised for explosive growth: AgriTech, CleanEnergy, HealthTech, EdTech, and D2C Consumer Brands.\n\nAgriTech alone is expected to attract over ₹2,000 Crore in investments this year, driven by government procurement digitisation and rising farmer incomes. CleanEnergy startups are benefiting from India's ambitious 500GW renewable energy target by 2030.\n\nOur recommendation: diversify your portfolio across at least 3 sectors to hedge sector-specific risk while capitalising on India's multi-decade growth story.',
+        author: 'Elevate Market Analyst',
+        timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
+      },
+      {
+        title: 'Understanding Valuation Caps and SAFE Notes — A Guide for New Investors',
+        content: 'If you are new to startup investing, two terms will appear constantly: Valuation Cap and SAFE Notes (Simple Agreement for Future Equity). Understanding them is essential before deploying capital.\n\nA Valuation Cap sets the maximum company valuation at which your investment converts to equity in a future funding round. This protects early investors from excessive dilution.\n\nA SAFE Note is an agreement to receive equity in the future (typically at the next funding round) in exchange for capital today. Unlike convertible notes, SAFEs do not accrue interest or have a maturity date, making them simpler for both parties.\n\nAt Elevate, all listed startups disclose their security type and valuation cap upfront on each deal page.',
+        author: 'Elevate Research Team',
+        timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+      },
+      {
+        title: 'Portfolio Diversification 101: How to Build a Resilient Startup Portfolio',
+        content: 'Startup investing carries inherent risk — statistically, 9 out of 10 startups fail within their first decade. However, a well-diversified portfolio across sectors, stages, and geographies can significantly improve your risk-adjusted returns.\n\nOur recommended strategy for retail investors: 1) Invest in at least 8-10 startups to achieve meaningful diversification. 2) Limit any single startup to no more than 20% of your total startup allocation. 3) Mix primary market (new rounds) and secondary market (existing shareholders) deals. 4) Re-invest returns from successful exits into new deals.\n\nRemember: startup investing is a long-term game. Expect a 5-7 year horizon for most investments to mature.',
+        author: 'Elevate Market Analyst',
+        timestamp: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000)
+      },
+      {
+        title: 'Due Diligence Checklist: What to Review Before Investing in a Startup',
+        content: 'Before committing capital to any startup on Elevate, run through this essential due diligence checklist:\n\n✅ Founding Team: Do the founders have relevant domain expertise? Have they built and scaled a business before?\n✅ Market Size: Is the Total Addressable Market (TAM) large enough to support a ₹500Cr+ company?\n✅ Revenue Model: Is the business model proven? Are there existing paying customers?\n✅ Valuation: Is the current valuation justified relative to revenue multiples in the sector?\n✅ Cap Table: Is the cap table clean? Are there any red flags in previous funding rounds?\n✅ Use of Funds: Is the allocation of raised capital clearly defined and realistic?\n\nAt Elevate, all approved startups have passed our internal review process, but thorough personal due diligence is always recommended.',
+        author: 'Elevate Research Team',
+        timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000)
+      }
+    ];
+
+    for (const blogData of expertBlogs) {
+      const blog = new Blog(blogData);
+      await blog.save();
+    }
+    console.log('Seeded 5 expert analyst blogs.');
 
     console.log('Seeding completed successfully.');
     if (require.main === module) {
