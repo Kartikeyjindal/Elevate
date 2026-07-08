@@ -1,6 +1,6 @@
 require('dotenv').config();
 const express = require('express');
-const mongoose = require('./models/mockMongoose');
+const mongoose = require('mongoose');
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
@@ -35,9 +35,9 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/crowdfundin
     try {
       const seedDatabase = require('./seed');
       await seedDatabase();
-      console.log('Mock database auto-seeded successfully.');
+      console.log('Database seed check complete.');
     } catch (err) {
-      console.error('Failed to auto-seed mock database:', err);
+      console.error('Failed to seed database:', err);
     }
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

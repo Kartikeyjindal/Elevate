@@ -1,4 +1,4 @@
-const mongoose = require('./mockMongoose');
+const mongoose = require('mongoose');
 
 const investmentSchema = new mongoose.Schema({
   userId: {

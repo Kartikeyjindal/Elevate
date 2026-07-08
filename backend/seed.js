@@ -1,5 +1,5 @@
 require('dotenv').config();
-const mongoose = require('./models/mockMongoose');
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/user');
 const Startup = require('./models/startup');
@@ -10,16 +10,19 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/crowdfundi
 
 async function seedDatabase() {
   try {
-    console.log(`Connecting to MongoDB at: ${MONGO_URI}`);
-    await mongoose.connect(MONGO_URI);
-    console.log('Connected to MongoDB. Clearing database...');
+    // If called from server.js, mongoose is already connected. If standalone, connect.
+    if (mongoose.connection.readyState === 0) {
+      console.log(`Connecting to MongoDB at: ${MONGO_URI}`);
+      await mongoose.connect(MONGO_URI);
+    }
 
-    // Clear existing data
-    await User.deleteMany({});
-    await Startup.deleteMany({});
-    await Investment.deleteMany({});
-    await Blog.deleteMany({});
-    console.log('Database cleared.');
+    // --- IDEMPOTENT SEED: Only seed if data doesn't already exist ---
+    const existingUsers = await User.countDocuments();
+    if (existingUsers > 0) {
+      console.log(`Database already has ${existingUsers} users. Skipping seed to preserve existing data.`);
+      return;
+    }
+    console.log('Empty database detected. Running initial seed...');
 
     // 1. Seed Admin
     const adminPasswordHash = await bcrypt.hash('admin123', 10);

@@ -1,4 +1,4 @@
-const mongoose = require('./mockMongoose');
+const mongoose = require('mongoose');
 
 const blogSchema = new mongoose.Schema({
   title: {
