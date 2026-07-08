@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { API_URL } from '../config';
+import { smoothToggleTheme } from '../utils/themeUtils';
 import { Form, Input, Button, Card, Typography, Space, Divider, message, Segmented } from 'antd';
 import {
   LockOutlined, RiseOutlined, TeamOutlined, RocketOutlined,
@@ -97,9 +98,10 @@ export default function Login() {
   };
 
   const toggleTheme = () => {
-    const nextTheme = themeMode === 'dark' ? 'light' : 'dark';
-    localStorage.setItem('theme', nextTheme);
-    window.dispatchEvent(new Event('themeChanged'));
+    smoothToggleTheme(themeMode === 'dark', (nextTheme) => {
+      localStorage.setItem('theme', nextTheme);
+      window.dispatchEvent(new Event('themeChanged'));
+    });
   };
 
   const isDark = themeMode === 'dark';

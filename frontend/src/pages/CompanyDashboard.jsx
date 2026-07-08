@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../config';
+import { smoothToggleTheme } from '../utils/themeUtils';
 import { 
   Layout, Card, Row, Col, Statistic, Button, 
   Form, InputNumber, Table, Tag, Space, Typography, Progress, message, Alert,
@@ -108,9 +109,10 @@ export default function CompanyDashboard() {
 
 
   const toggleTheme = () => {
-    const nextTheme = isDarkMode ? 'light' : 'dark';
-    localStorage.setItem('theme', nextTheme);
-    window.dispatchEvent(new Event('themeChanged'));
+    smoothToggleTheme(isDarkMode, (nextTheme) => {
+      localStorage.setItem('theme', nextTheme);
+      window.dispatchEvent(new Event('themeChanged'));
+    });
   };
 
   const tc = isDarkMode ? '#f1f5f9' : '#44475b';

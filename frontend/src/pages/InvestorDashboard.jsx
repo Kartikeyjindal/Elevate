@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { API_URL } from '../config';
+import { smoothToggleTheme } from '../utils/themeUtils';
 import { 
   Layout, Card, Row, Col, Statistic, Button, Modal, 
   Form, Input, InputNumber, Table, Tabs, Tag, Space, Typography, Progress, message,
@@ -104,9 +105,10 @@ export default function InvestorDashboard() {
   }, []);
 
   const toggleTheme = () => {
-    const nextTheme = isDarkMode ? 'light' : 'dark';
-    localStorage.setItem('theme', nextTheme);
-    window.dispatchEvent(new Event('themeChanged'));
+    smoothToggleTheme(isDarkMode, (nextTheme) => {
+      localStorage.setItem('theme', nextTheme);
+      window.dispatchEvent(new Event('themeChanged'));
+    });
   };
 
   const tc = isDarkMode ? '#f1f5f9' : '#44475b';
