@@ -169,19 +169,8 @@ router.post('/invest', verifyToken, async (req, res) => {
 router.get('/my', verifyToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const investments = await Investment.find({ userId });
-    
-    const populatedInvestments = [];
-    for (const inv of investments) {
-      const invObj = JSON.parse(JSON.stringify(inv));
-      if (inv.startupId) {
-        const startupDoc = await Startup.findById(inv.startupId);
-        invObj.startupId = startupDoc ? JSON.parse(JSON.stringify(startupDoc)) : null;
-      }
-      populatedInvestments.push(invObj);
-    }
-    
-    res.status(200).json(populatedInvestments);
+    const investments = await Investment.find({ userId }).populate('startupId').lean();
+    res.status(200).json(investments);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

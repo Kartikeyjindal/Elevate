@@ -663,6 +663,28 @@ export default function InvestorDashboard() {
     setSubmittingInvestment(true);
     const token = localStorage.getItem('token');
 
+    // --- OPTIMISTIC UPDATE: Close modal & update UI instantly ---
+    const tempId = `temp_${Date.now()}`;
+    const optimisticInvestment = {
+      key: tempId,
+      startupId: selectedStartup._id,
+      startupName: selectedStartup.name,
+      amount: investAmount,
+      timestamp: new Date().toLocaleString(),
+      startupObj: selectedStartup
+    };
+    const prevUser = { ...currentUser };
+    const optimisticUser = { ...currentUser, walletBalance: currentUser.walletBalance - investAmount };
+    const prevInvestments = myInvestments;
+
+    setMyInvestments(prev => [optimisticInvestment, ...prev]);
+    setCurrentUser(optimisticUser);
+    localStorage.setItem('user', JSON.stringify(optimisticUser));
+    setStartups(prev => prev.map(s =>
+      s._id === selectedStartup._id ? { ...s, raisedAmount: (s.raisedAmount || 0) + investAmount } : s
+    ));
+    setInvestModalVisible(false);
+
     try {
       const res = await fetch(`${API_URL}/api/invest`, {
         method: 'POST',
@@ -678,25 +700,26 @@ export default function InvestorDashboard() {
 
       const data = await res.json();
       if (!res.ok) {
+        // Rollback optimistic update on failure
+        setMyInvestments(prevInvestments);
+        setCurrentUser(prevUser);
+        localStorage.setItem('user', JSON.stringify(prevUser));
+        setStartups(prev => prev.map(s =>
+          s._id === selectedStartup._id ? { ...s, raisedAmount: Math.max(0, (s.raisedAmount || 0) - investAmount) } : s
+        ));
         throw new Error(data.error || 'Investment failed');
       }
 
-      message.success('Investment confirmed successfully!');
-      
-      const updatedUser = { ...currentUser, walletBalance: data.updatedWalletBalance };
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-      setCurrentUser(updatedUser);
-      
-      const mockInvestment = {
-        key: data.investment._id,
-        startupName: selectedStartup.name,
-        amount: investAmount,
-        timestamp: new Date().toLocaleString()
-      };
-      setMyInvestments(prev => [mockInvestment, ...prev]);
-
-      setInvestModalVisible(false);
-      fetchData();
+      // Replace temp id with real id from server
+      setMyInvestments(prev => prev.map(inv =>
+        inv.key === tempId
+          ? { ...inv, key: data.investment._id }
+          : inv
+      ));
+      const confirmedUser = { ...optimisticUser, walletBalance: data.updatedWalletBalance };
+      setCurrentUser(confirmedUser);
+      localStorage.setItem('user', JSON.stringify(confirmedUser));
+      message.success('✅ Investment confirmed!');
     } catch (err) {
       message.error(err.message);
     } finally {
@@ -706,6 +729,24 @@ export default function InvestorDashboard() {
 
   const handleSellInvestment = async (investmentId) => {
     const token = localStorage.getItem('token');
+
+    // Find the investment to sell for optimistic rollback
+    const investmentToSell = myInvestments.find(inv => inv.key === investmentId);
+    if (!investmentToSell) return;
+
+    // --- OPTIMISTIC UPDATE: Remove from list and refund wallet instantly ---
+    const prevInvestments = myInvestments;
+    const prevUser = { ...currentUser };
+    const refundAmount = investmentToSell.amount;
+
+    setMyInvestments(prev => prev.filter(inv => inv.key !== investmentId));
+    const optimisticUser = { ...currentUser, walletBalance: (currentUser.walletBalance || 0) + refundAmount };
+    setCurrentUser(optimisticUser);
+    localStorage.setItem('user', JSON.stringify(optimisticUser));
+    setStartups(prev => prev.map(s =>
+      s._id === investmentToSell.startupId ? { ...s, raisedAmount: Math.max(0, (s.raisedAmount || 0) - refundAmount) } : s
+    ));
+
     try {
       const res = await fetch(`${API_URL}/api/sell`, {
         method: 'POST',
@@ -718,11 +759,21 @@ export default function InvestorDashboard() {
 
       const data = await res.json();
       if (!res.ok) {
+        // Rollback optimistic update on failure
+        setMyInvestments(prevInvestments);
+        setCurrentUser(prevUser);
+        localStorage.setItem('user', JSON.stringify(prevUser));
+        setStartups(prev => prev.map(s =>
+          s._id === investmentToSell.startupId ? { ...s, raisedAmount: (s.raisedAmount || 0) + refundAmount } : s
+        ));
         throw new Error(data.error || 'Failed to sell investment');
       }
 
-      message.success('Shares sold and balance refunded successfully!');
-      fetchData();
+      // Sync confirmed wallet balance from server
+      const confirmedUser = { ...optimisticUser, walletBalance: data.updatedWalletBalance };
+      setCurrentUser(confirmedUser);
+      localStorage.setItem('user', JSON.stringify(confirmedUser));
+      message.success('✅ Shares sold and balance refunded!');
     } catch (err) {
       message.error(err.message);
     }
