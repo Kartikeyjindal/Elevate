@@ -343,12 +343,13 @@ router.post('/request-otp-login', async (req, res) => {
       email: user.email
     };
 
-    await sendOTPEmail(user.email, otp);
+    const emailResult = await sendOTPEmail(user.email, otp);
 
     return res.status(200).json({
       requireOtp: true,
       userId: user._id,
-      message: 'OTP sent to registered email'
+      message: 'OTP sent to registered email',
+      ...(emailResult && emailResult.mock && { mockOtp: otp })
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -432,9 +433,12 @@ router.post('/resend-otp', async (req, res) => {
       email: user.email
     };
 
-    await sendOTPEmail(user.email, otp);
+    const emailResult = await sendOTPEmail(user.email, otp);
 
-    return res.status(200).json({ message: 'OTP resent successfully to registered email' });
+    return res.status(200).json({ 
+      message: 'OTP resent successfully to registered email',
+      ...(emailResult && emailResult.mock && { mockOtp: otp })
+    });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

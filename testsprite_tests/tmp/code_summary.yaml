@@ -1,0 +1,108 @@
+version: "2"
+type: frontend
+tech_stack:
+  - HTML
+  - JavaScript
+  - React
+  - Ant Design
+  - Vite
+routes:
+  - path: /login
+    file: src/pages/Login.jsx
+    auth_required: false
+    description: User login page
+  - path: /register
+    file: src/pages/Register.jsx
+    auth_required: false
+    description: User registration page
+  - path: /investor
+    file: src/pages/InvestorDashboard.jsx
+    auth_required: true
+    description: Investor dashboard page to view listings, manage portfolio and view market news
+  - path: /admin
+    file: src/pages/AdminDashboard.jsx
+    auth_required: true
+    description: Admin dashboard to review and approve startup applications, audit logs, and create news/blogs
+  - path: /company
+    file: src/pages/CompanyDashboard.jsx
+    auth_required: true
+    description: Startup founder dashboard to track valuation, investments raised
+  - path: /company/apply
+    file: src/pages/StartupApplication.jsx
+    auth_required: true
+    description: Multi-step fundraising startup application form
+features:
+  - name: User Authentication
+    description: User registration and login using email/username and password or OTP. Only gmail allowed for registration.
+    files:
+      - src/pages/Login.jsx
+      - src/pages/Register.jsx
+    entry_route: /login
+    user_interactions:
+      - Fill login credentials or request OTP login
+      - Input OTP or password
+      - Click submit to authenticate and redirect to dashboard
+    api_calls:
+      - method: POST
+        endpoint: /api/auth/login
+      - method: POST
+        endpoint: /api/auth/register
+      - method: POST
+        endpoint: /api/auth/request-otp-login
+      - method: POST
+        endpoint: /api/auth/verify-otp
+  - name: Investor Deals & Portfolio
+    description: Browse accredited startup listings, invest funds, view live news feeds and expert blogs.
+    files:
+      - src/pages/InvestorDashboard.jsx
+    entry_route: /investor
+    user_interactions:
+      - Navigate tabs between Explore Deals, Portfolio, and Venture Insights
+      - Search startups by name or category
+      - Click Invest and specify amount to invest in a startup
+      - View details of selected startups
+    api_calls:
+      - method: GET
+        endpoint: /api/startups
+      - method: POST
+        endpoint: /api/invest
+      - method: GET
+        endpoint: /api/my
+      - method: GET
+        endpoint: /api/blogs/market-news
+  - name: Startup Founder Dashboard & Application
+    description: Founders can track raised amount, update startup valuations, and submit multi-step application details.
+    files:
+      - src/pages/CompanyDashboard.jsx
+      - src/pages/StartupApplication.jsx
+    entry_route: /company
+    user_interactions:
+      - View raised amount and investor list
+      - Input new valuation and update curve graph
+      - Fill and submit startup registration details
+    api_calls:
+      - method: GET
+        endpoint: /api/startups/my-startup
+      - method: POST
+        endpoint: /api/startups/my-startup/valuation
+      - method: PUT
+        endpoint: /api/startups/my-startup/application
+  - name: Administrator Management
+    description: Admins can approve or reject pending startups, view audit logs, and write system blogs.
+    files:
+      - src/pages/AdminDashboard.jsx
+    entry_route: /admin
+    user_interactions:
+      - View pending startup list and approve/reject them
+      - View system audit log events
+      - Write and publish new system blog posts
+    api_calls:
+      - method: GET
+        endpoint: /api/admin/startups/pending
+      - method: PUT
+        endpoint: /api/admin/startups/:id
+      - method: GET
+        endpoint: /api/admin/audit-logs
+      - method: POST
+        endpoint: /api/blogs
+known_limitations: []

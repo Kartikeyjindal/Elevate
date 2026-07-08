@@ -86,7 +86,11 @@ export default function Login() {
       if (!response.ok) throw new Error(data.error || 'Failed to resend OTP');
       
       setResendCooldown(60);
-      message.success('A new 6-digit OTP code has been sent to your email.');
+      if (data.mockOtp) {
+        message.success(`[Mock Email] OTP resent! Use code: ${data.mockOtp}`, 15);
+      } else {
+        message.success('A new 6-digit OTP code has been sent to your email.');
+      }
     } catch (error) {
       setErrorMsg(error.message);
     }
@@ -148,6 +152,11 @@ export default function Login() {
         setUserId(data.userId);
         setStep(1);
         setResendCooldown(60);
+        if (data.mockOtp) {
+          message.success(`[Mock Email] Your OTP code is: ${data.mockOtp}`, 15);
+        } else {
+          message.success('A 6-digit OTP code has been sent to your email.');
+        }
       }
     } catch (error) {
       setErrorMsg(error.message);
