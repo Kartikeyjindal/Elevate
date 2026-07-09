@@ -1286,35 +1286,6 @@ export default function InvestorDashboard() {
                       scroll={{ x: true }}
                     />
                   </Card>
-
-                  {/* Founder CTA */}
-                  <Card 
-                    style={{ 
-                      marginTop: 24, 
-                      background: isDarkMode ? 'linear-gradient(135deg, #064e3b 0%, #0d2d2e 100%)' : 'linear-gradient(135deg, #e6fffa 0%, #f0fdf9 100%)',
-                      border: `1px solid ${isDarkMode ? '#065f46' : '#a7f3d0'}`,
-                      borderRadius: 16
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-                      <div>
-                        <Title level={4} style={{ color: isDarkMode ? '#6ee7b7' : '#065f46', margin: 0, fontFamily: 'Outfit', fontWeight: 700 }}>
-                          🚀 Are You a Startup Founder?
-                        </Title>
-                        <Text style={{ color: isDarkMode ? '#a7f3d0' : '#047857', fontSize: 14 }}>
-                          List your startup on Elevate and raise capital from thousands of retail investors.
-                        </Text>
-                      </div>
-                      <Button 
-                        type="primary" 
-                        size="large"
-                        style={{ background: '#00d09c', borderColor: '#00d09c', fontWeight: 700, borderRadius: 8 }}
-                        onClick={() => navigate('/register?type=company')}
-                      >
-                        Register as Founder →
-                      </Button>
-                    </div>
-                  </Card>
                 </div>
               )
             },
