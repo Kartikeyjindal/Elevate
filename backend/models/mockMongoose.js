@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const EventEmitter = require('events');
 
 // Global in-memory storage simulating collections
 const dbStore = {
@@ -51,6 +52,37 @@ class MockSession {
   endSession() {}
 }
 
+class MockConnection extends EventEmitter {
+  constructor() {
+    super();
+    this.readyState = 1; // Connected
+  }
+}
+
+const mockConnection = new MockConnection();
+
+class MockQuery extends Array {
+  populate(path) {
+    if (path === 'startupId') {
+      const startups = dbStore['Startup'] || [];
+      for (const doc of this) {
+        if (doc.startupId) {
+          const idStr = doc.startupId.toString();
+          const startup = startups.find(s => s._id.toString() === idStr);
+          if (startup) {
+            doc.startupId = JSON.parse(JSON.stringify(startup));
+          }
+        }
+      }
+    }
+    return this;
+  }
+
+  lean() {
+    return this;
+  }
+}
+
 const Schema = class {
   constructor(definition, options) {
     this.definition = definition;
@@ -63,6 +95,7 @@ Schema.Types = {
 
 const mockMongoose = {
   Schema,
+  connection: mockConnection,
 
   model(modelName, schema) {
     if (!dbStore[modelName]) {
@@ -111,7 +144,8 @@ const mockMongoose = {
           });
         }
         // Deep copy results to mock DB isolation
-        return results.map(item => new MockModel(JSON.parse(JSON.stringify(item))));
+        const models = results.map(item => new MockModel(JSON.parse(JSON.stringify(item))));
+        return MockQuery.from(models);
       }
 
       static async findOne(query = {}) {
@@ -163,6 +197,11 @@ const mockMongoose = {
         collection.push(...remaining);
         return { deletedCount: initialLength - collection.length };
       }
+
+      static async countDocuments(query = {}) {
+        const results = await this.find(query);
+        return results.length;
+      }
     }
 
     return MockModel;
@@ -170,6 +209,7 @@ const mockMongoose = {
 
   async connect() {
     console.log('--- Mock Database Connection Established Successfully ---');
+    mockConnection.emit('connected');
     return true;
   },
 

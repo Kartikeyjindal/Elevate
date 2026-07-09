@@ -1,4 +1,4 @@
-const fetch = require('node-fetch'); // wait, let's check if node-fetch is available, or use global fetch in Node 18+
+// Use native fetch
 
 async function run() {
   try {
@@ -6,11 +6,12 @@ async function run() {
     const loginRes = await fetch('http://localhost:5001/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@example.com', password: 'admin123' })
+      body: JSON.stringify({ identifier: 'admin@example.com', password: 'admin123' })
     });
     
     if (!loginRes.ok) {
-      throw new Error(`Login failed: ${loginRes.status}`);
+      const errText = await loginRes.text();
+      throw new Error(`Login failed: ${loginRes.status} - ${errText}`);
     }
     
     const loginData = await loginRes.json();

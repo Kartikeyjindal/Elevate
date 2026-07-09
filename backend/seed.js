@@ -16,45 +16,52 @@ async function seedDatabase() {
       await mongoose.connect(MONGO_URI);
     }
 
-    // --- IDEMPOTENT SEED: Only seed if data doesn't already exist ---
-    const existingUsers = await User.countDocuments();
-    if (existingUsers > 0) {
-      console.log(`Database already has ${existingUsers} users. Skipping seed to preserve existing data.`);
-      return;
+    console.log('Running robust idempotent seed check...');
+
+    // 1. Seed Admin if missing
+    const adminExists = await User.findOne({ username: 'admin' });
+    if (!adminExists) {
+      const adminPasswordHash = await bcrypt.hash('admin123', 10);
+      const adminUser = new User({
+        name: 'System Admin',
+        username: 'admin',
+        email: 'admin@example.com',
+        passwordHash: adminPasswordHash,
+        role: 'admin',
+        walletBalance: 0
+      });
+      await adminUser.save();
+      console.log('Seeded Admin: admin@example.com / admin123  (username: admin)');
+    } else {
+      console.log('Admin user already exists. Skipping Admin seed.');
     }
-    console.log('Empty database detected. Running initial seed...');
 
-    // 1. Seed Admin
-    const adminPasswordHash = await bcrypt.hash('admin123', 10);
-    const adminUser = new User({
-      name: 'System Admin',
-      username: 'admin',
-      email: 'admin@example.com',
-      passwordHash: adminPasswordHash,
-      role: 'admin',
-      walletBalance: 0
-    });
-    await adminUser.save();
-    console.log('Seeded Admin: admin@example.com / admin123  (username: admin)');
-
-    // 2. Seed Investor (only pre-defined account)
-    const investorPasswordHash = await bcrypt.hash('investor123', 10);
-    const investorUser = new User({
-      name: 'Demo Investor',
-      username: 'investor',
-      email: 'investor@example.com',
-      passwordHash: investorPasswordHash,
-      role: 'investor',
-      walletBalance: 1000000,
-      portfolio: []
-    });
-    await investorUser.save();
-    console.log('Seeded Investor: investor@example.com / investor123  (username: investor)');
+    // 2. Seed Investor if missing (only pre-defined account)
+    const investorExists = await User.findOne({ username: 'investor' });
+    if (!investorExists) {
+      const investorPasswordHash = await bcrypt.hash('investor123', 10);
+      const investorUser = new User({
+        name: 'Demo Investor',
+        username: 'investor',
+        email: 'investor@example.com',
+        passwordHash: investorPasswordHash,
+        role: 'investor',
+        walletBalance: 1000000,
+        portfolio: []
+      });
+      await investorUser.save();
+      console.log('Seeded Investor: investor@example.com / investor123  (username: investor)');
+    } else {
+      console.log('Investor user already exists. Skipping Investor seed.');
+    }
 
     // NOTE: Only these 2 accounts exist by default. All other users must register.
 
-    // 3. Seed 10 Approved Startups
-    const approvedStartups = [
+    // 3. Seed Startups if missing
+    const startupsCount = await Startup.countDocuments();
+    if (startupsCount === 0) {
+      console.log('No startups found. Seeding default startups...');
+      const approvedStartups = [
       {
         name: 'Rentberry India',
         category: 'Real Estate / PropTech',
@@ -758,23 +765,29 @@ async function seedDatabase() {
       }
     ];
 
-    for (const item of pendingStartups) {
-      const startup = new Startup(item);
-      await startup.save();
+      for (const item of pendingStartups) {
+        const startup = new Startup(item);
+        await startup.save();
+      }
+      console.log('Seeded 2 pending startups.');
+    } else {
+      console.log(`Database already has ${startupsCount} startups. Skipping startups seed.`);
     }
-    console.log('Seeded 2 pending startups.');
 
-    // 5. Seed Expert Analyst Blogs
-    const expertBlogs = [
+    // 5. Seed Expert Analyst Blogs if missing
+    const blogsCount = await Blog.countDocuments();
+    if (blogsCount === 0) {
+      console.log('No blogs found. Seeding expert blogs...');
+      const expertBlogs = [
       {
         title: 'Why Early-Stage Crowdfunding Beats Traditional VC for Indian Startups',
-        content: 'The venture capital ecosystem in India has long favoured late-stage bets, leaving a massive funding gap for seed and pre-Series A founders. Crowdfunding platforms like Elevate bridge that gap by democratising access to capital and allowing retail investors to participate in high-growth opportunities previously reserved for institutional players.\n\nKey insights: 1) Crowdfunding rounds close 3x faster than traditional VC in India. 2) Retail investor participation increases startup visibility and creates early adopter communities. 3) SEBI's new framework for alternative investment funds (AIFs) is making it easier for platforms like Elevate to operate in compliance.',
+        content: 'The venture capital ecosystem in India has long favoured late-stage bets, leaving a massive funding gap for seed and pre-Series A founders. Crowdfunding platforms like Elevate bridge that gap by democratising access to capital and allowing retail investors to participate in high-growth opportunities previously reserved for institutional players.\n\nKey insights: 1) Crowdfunding rounds close 3x faster than traditional VC in India. 2) Retail investor participation increases startup visibility and creates early adopter communities. 3) SEBI\'s new framework for alternative investment funds (AIFs) is making it easier for platforms like Elevate to operate in compliance.',
         author: 'Elevate Research Team',
         timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
       },
       {
-        title: 'Top 5 Sectors to Watch in India's Startup Ecosystem — H2 2026',
-        content: 'As we enter the second half of 2026, our analysts have identified five sectors poised for explosive growth: AgriTech, CleanEnergy, HealthTech, EdTech, and D2C Consumer Brands.\n\nAgriTech alone is expected to attract over ₹2,000 Crore in investments this year, driven by government procurement digitisation and rising farmer incomes. CleanEnergy startups are benefiting from India's ambitious 500GW renewable energy target by 2030.\n\nOur recommendation: diversify your portfolio across at least 3 sectors to hedge sector-specific risk while capitalising on India's multi-decade growth story.',
+        title: "Top 5 Sectors to Watch in India's Startup Ecosystem — H2 2026",
+        content: 'As we enter the second half of 2026, our analysts have identified five sectors poised for explosive growth: AgriTech, CleanEnergy, HealthTech, EdTech, and D2C Consumer Brands.\n\nAgriTech alone is expected to attract over ₹2,000 Crore in investments this year, driven by government procurement digitisation and rising farmer incomes. CleanEnergy startups are benefiting from India\'s ambitious 500GW renewable energy target by 2030.\n\nOur recommendation: diversify your portfolio across at least 3 sectors to hedge sector-specific risk while capitalising on India\'s multi-decade growth story.',
         author: 'Elevate Market Analyst',
         timestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
       },
@@ -798,11 +811,14 @@ async function seedDatabase() {
       }
     ];
 
-    for (const blogData of expertBlogs) {
-      const blog = new Blog(blogData);
-      await blog.save();
+      for (const blogData of expertBlogs) {
+        const blog = new Blog(blogData);
+        await blog.save();
+      }
+      console.log('Seeded 5 expert analyst blogs.');
+    } else {
+      console.log(`Database already has ${blogsCount} blogs. Skipping blogs seed.`);
     }
-    console.log('Seeded 5 expert analyst blogs.');
 
     console.log('Seeding completed successfully.');
     if (require.main === module) {
