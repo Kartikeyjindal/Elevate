@@ -74,6 +74,85 @@ function Sparkline({ data }) {
   );
 }
 
+// Groww-style Mint Green Valuation Sparkline Component
+function ValuationSparkline({ data }) {
+  if (!data || data.length < 2) return null;
+  const width = 600;
+  const height = 150;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min === 0 ? 1 : max - min;
+  
+  const points = data.map((val, idx) => {
+    const x = (idx / (data.length - 1)) * width;
+    const y = height - ((val - min) / range) * (height - 30) - 15;
+    return `${x},${y}`;
+  });
+  
+  const pathData = `M ${points.join(' L ')}`;
+  const gradId = `valuation-spark-grad-${Math.floor(Math.random() * 1000000)}`;
+  const strokeColor = '#00d09c'; // Groww Green
+  
+  const formatCurrencyShort = (val) => {
+    if (val >= 10000000) {
+      return `₹${(val / 10000000).toFixed(1)} Cr`;
+    }
+    if (val >= 100000) {
+      return `₹${(val / 100000).toFixed(1)} L`;
+    }
+    return `₹${val.toLocaleString()}`;
+  };
+
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
+          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path
+        d={`${pathData} L ${width},${height} L 0,${height} Z`}
+        fill={`url(#${gradId})`}
+      />
+      <path
+        d={pathData}
+        fill="none"
+        stroke={strokeColor}
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {data.map((val, idx) => {
+        const x = (idx / (data.length - 1)) * width;
+        const y = height - ((val - min) / range) * (height - 30) - 15;
+        return (
+          <g key={idx}>
+            <circle
+              cx={x}
+              cy={y}
+              r="4.5"
+              fill={strokeColor}
+              stroke="#fff"
+              strokeWidth="2"
+            />
+            <text
+              x={x}
+              y={y - 12}
+              textAnchor="middle"
+              fill="#7c8099"
+              fontSize="10"
+              fontWeight="600"
+            >
+              {formatCurrencyShort(val)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
 export default function InvestorDashboard() {
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState(null);
@@ -82,6 +161,9 @@ export default function InvestorDashboard() {
   const [myInvestments, setMyInvestments] = useState([]);
   const [investModalVisible, setInvestModalVisible] = useState(false);
   const [selectedStartup, setSelectedStartup] = useState(null);
+  const [companyDetailsVisible, setCompanyDetailsVisible] = useState(false);
+  const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
+  const [companyDetailsData, setCompanyDetailsData] = useState(null);
   const [investAmount, setInvestAmount] = useState(10000);
   const [submittingInvestment, setSubmittingInvestment] = useState(false);
   const [expandedStartupId, setExpandedStartupId] = useState(null);
@@ -644,6 +726,29 @@ export default function InvestorDashboard() {
     ]
   };
 
+  const handleOpenCompanyDetails = async (startup) => {
+    setCompanyDetailsVisible(true);
+    setCompanyDetailsLoading(true);
+    setCompanyDetailsData(null);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_URL}/api/startups/${startup._id}/details`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCompanyDetailsData(data);
+      } else {
+        message.error('Failed to load company details.');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Error fetching company details.');
+    } finally {
+      setCompanyDetailsLoading(false);
+    }
+  };
+
   const handleOpenInvestModal = (startup) => {
     setSelectedStartup(startup);
     setInvestAmount(startup.minimumInvestment || 10000);
@@ -837,7 +942,29 @@ export default function InvestorDashboard() {
       title: 'Venture Name',
       dataIndex: 'startupName',
       key: 'startupName',
-      render: (text) => <Text style={{ color: tc, fontWeight: 600 }}>{text}</Text>
+      render: (text, record) => (
+        <span 
+          onClick={() => {
+            if (record.startupObj) {
+              handleOpenCompanyDetails(record.startupObj);
+            }
+          }}
+          style={{ 
+            color: tc, 
+            fontWeight: 600, 
+            cursor: record.startupObj ? 'pointer' : 'default',
+            textDecoration: record.startupObj ? 'underline' : 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (record.startupObj) e.target.style.color = '#00d09c';
+          }}
+          onMouseLeave={(e) => {
+            if (record.startupObj) e.target.style.color = tc;
+          }}
+        >
+          {text}
+        </span>
+      )
     },
     {
       title: 'Amount Invested',
@@ -1132,7 +1259,20 @@ export default function InvestorDashboard() {
                               bodyStyle={{ padding: 20 }}
                             >
                               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
-                                <Title level={4} style={{ color: isDarkMode ? '#f1f5f9' : '#1e293b', margin: 0, fontFamily: 'Outfit', fontWeight: 800, fontSize: 18 }}>
+                                <Title 
+                                  level={4} 
+                                  style={{ 
+                                    color: isDarkMode ? '#f1f5f9' : '#1e293b', 
+                                    margin: 0, 
+                                    fontFamily: 'Outfit', 
+                                    fontWeight: 800, 
+                                    fontSize: 18,
+                                    cursor: 'pointer'
+                                  }}
+                                  onClick={() => handleOpenCompanyDetails(startup)}
+                                  onMouseEnter={(e) => e.target.style.color = '#00d09c'}
+                                  onMouseLeave={(e) => e.target.style.color = isDarkMode ? '#f1f5f9' : '#1e293b'}
+                                >
                                   {startup.name}
                                 </Title>
                               </div>
@@ -1939,6 +2079,309 @@ export default function InvestorDashboard() {
                 </Button>
               ]}
             />
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Startup Details Modal ── */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, borderBottom: isDarkMode ? '1px solid #1f2937' : '1px solid #f1f5f9', paddingBottom: 12 }}>
+            {companyDetailsData?.startup?.logoUrl && (
+              <img 
+                src={companyDetailsData.startup.logoUrl} 
+                alt={companyDetailsData.startup.name} 
+                style={{ width: 40, height: 40, borderRadius: 8, objectFit: 'cover' }}
+              />
+            )}
+            <div>
+              <div style={{ color: tc, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}>
+                {companyDetailsData?.startup?.name}
+              </div>
+              <div style={{ fontSize: 12, color: '#00d09c', fontWeight: 600 }}>
+                {companyDetailsData?.startup?.category}
+              </div>
+            </div>
+          </div>
+        }
+        open={companyDetailsVisible}
+        onCancel={() => setCompanyDetailsVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setCompanyDetailsVisible(false)} style={{ borderRadius: 8 }}>
+            Close
+          </Button>,
+          companyDetailsData?.startup?.daysLeft > 0 && (
+            <Button 
+              key="invest" 
+              type="primary" 
+              icon={<DollarOutlined />}
+              onClick={() => {
+                setCompanyDetailsVisible(false);
+                handleOpenInvestModal(companyDetailsData.startup);
+              }}
+              style={{
+                backgroundColor: '#00d09c',
+                borderColor: '#00d09c',
+                borderRadius: 8,
+                fontWeight: 700
+              }}
+            >
+              Invest Now
+            </Button>
+          )
+        ]}
+        width={750}
+        style={{ borderRadius: 16 }}
+        styles={{ body: { padding: '10px 0' } }}
+      >
+        {companyDetailsLoading ? (
+          <div style={{ textAlign: 'center', padding: '50px 0' }}>
+            <Spin size="large" tip="Loading company profile & live data..." />
+          </div>
+        ) : companyDetailsData ? (
+          (() => {
+            const s = companyDetailsData.startup;
+            const investments = companyDetailsData.investments || [];
+            const raisedProgress = Math.min(100, Math.round(((s.raisedAmount || 0) / (s.targetGoal || 1)) * 100));
+
+            return (
+              <Tabs defaultActiveKey="1" style={{ padding: '0 16px' }} items={[
+                {
+                  key: '1',
+                  label: <span style={{ fontWeight: 600 }}>Overview</span>,
+                  children: (
+                    <div style={{ padding: '8px 0' }}>
+                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Tagline</Text>
+                      <Paragraph style={{ color: tc, fontStyle: 'italic', fontSize: 13 }}>"{s.tagline}"</Paragraph>
+                      
+                      <Divider style={{ margin: '12px 0' }} />
+                      
+                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>What the Company Does</Text>
+                      <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#4b5563', fontSize: 13, lineHeight: 1.6 }}>
+                        {s.description || 'No detailed description available.'}
+                      </Paragraph>
+                      
+                      <Divider style={{ margin: '12px 0' }} />
+
+                      <Row gutter={[16, 16]}>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>FOUNDED YEAR</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>{s.foundedYear || 'N/A'}</Text>
+                        </Col>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LOCATION</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>{s.location || 'N/A'}</Text>
+                        </Col>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>STAGE</Text>
+                          <Tag color="cyan" style={{ fontWeight: 600, marginTop: 4 }}>{s.stage || 'Seed'}</Tag>
+                        </Col>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>TEAM SIZE</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>{s.teamSize || 'N/A'} Members</Text>
+                        </Col>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>WEBSITE</Text>
+                          {s.website ? (
+                            <a href={s.website} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
+                              {s.website.replace(/^https?:\/\/(www\.)?/, '')}
+                            </a>
+                          ) : 'N/A'}
+                        </Col>
+                        <Col span={12}>
+                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LINKEDIN</Text>
+                          {s.linkedIn ? (
+                            <a href={s.linkedIn} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
+                              LinkedIn Profile
+                            </a>
+                          ) : 'N/A'}
+                        </Col>
+                      </Row>
+                    </div>
+                  )
+                },
+                {
+                  key: '2',
+                  label: <span style={{ fontWeight: 600 }}>Financials & Valuation</span>,
+                  children: (
+                    <div style={{ padding: '8px 0' }}>
+                      <Row gutter={[16, 16]}>
+                        <Col span={12}>
+                          <Statistic 
+                            title={<span style={{ color: '#7c8099', fontSize: 12 }}>VALUATION CAP</span>} 
+                            value={s.valuationCap} 
+                            formatter={(v) => `₹${Number(v).toLocaleString()}`}
+                            valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
+                          />
+                        </Col>
+                        <Col span={12}>
+                          <Statistic 
+                            title={<span style={{ color: '#7c8099', fontSize: 12 }}>MINIMUM INVESTMENT</span>} 
+                            value={s.minimumInvestment} 
+                            formatter={(v) => `₹${Number(v).toLocaleString()}`}
+                            valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
+                          />
+                        </Col>
+                      </Row>
+
+                      <Divider style={{ margin: '16px 0' }} />
+
+                      <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>VALUATION HISTORY</Text>
+                      {s.pastValuations && s.pastValuations.length > 1 ? (
+                        <div style={{ background: bgInner, padding: 16, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7' }}>
+                          <ValuationSparkline data={s.pastValuations} />
+                          <div style={{ textAlign: 'center', marginTop: 8 }}>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Valuation Trend Curve (past rounds)</Text>
+                          </div>
+                        </div>
+                      ) : (
+                        <Text type="secondary">No valuation history data available.</Text>
+                      )}
+
+                      <Divider style={{ margin: '16px 0' }} />
+
+                      <div style={{ marginBottom: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
+                            ₹{(s.raisedAmount || 0).toLocaleString()} raised
+                          </Text>
+                          <Text style={{ color: tc, fontSize: 12, fontWeight: 600 }}>
+                            {raisedProgress}% of target (₹{(s.targetGoal || 0).toLocaleString()})
+                          </Text>
+                        </div>
+                        <Progress percent={raisedProgress} showInfo={false} strokeColor="#00d09c" strokeWidth={8} />
+                      </div>
+
+                      <Row gutter={[16, 16]} style={{ marginTop: 16, background: bgInner, padding: 12, borderRadius: 8 }}>
+                        <Col span={6}>
+                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>TRAILING REVENUE</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.trailingRevenue || 0).toLocaleString()}</Text>
+                        </Col>
+                        <Col span={6}>
+                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>EBITDA MARGIN</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>{s.ebitdaMargin || 0}%</Text>
+                        </Col>
+                        <Col span={6}>
+                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>BURN RATE</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.burnRate || 0).toLocaleString()}/mo</Text>
+                        </Col>
+                        <Col span={6}>
+                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>RUNWAY</Text>
+                          <Text style={{ color: tc, fontWeight: 600 }}>{s.runway || 0} Months</Text>
+                        </Col>
+                      </Row>
+                    </div>
+                  )
+                },
+                {
+                  key: '3',
+                  label: <span style={{ fontWeight: 600 }}>Strategy & Model</span>,
+                  children: (
+                    <div style={{ padding: '8px 0', maxHeight: 350, overflowY: 'auto' }}>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>BUSINESS MODEL</Text>
+                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.businessModel || 'Direct B2B/B2C services and platform subscription models.'}</Paragraph>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>MARKET OPPORTUNITY</Text>
+                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketOpportunity || 'Targeting emerging Indian consumer demographic & regional digital expansion.'}</Paragraph>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>COMPETITIVE ADVANTAGE</Text>
+                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.competitiveAdvantage || 'Proprietary technology, first-mover advantage, and local supply chain lock-in.'}</Paragraph>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>GO TO MARKET STRATEGY</Text>
+                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketingMixVariables || 'Standard marketing and offline channel distributions.'}</Paragraph>
+                      </div>
+                      <div style={{ marginBottom: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>USE OF FUNDS</Text>
+                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.useOfFunds || s.financialProcurement || 'Engineering scaling, tier-1 city user acquisition, and operating runway.'}</Paragraph>
+                      </div>
+                    </div>
+                  )
+                },
+                {
+                  key: '4',
+                  label: <span style={{ fontWeight: 600 }}>Team & Founders</span>,
+                  children: (
+                    <div style={{ padding: '8px 0' }}>
+                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Founding Team</Text>
+                      <Row gutter={[16, 16]}>
+                        <Col span={12}>
+                          <Card size="small" style={{ borderRadius: 8, background: bgInner }}>
+                            <Card.Meta 
+                              avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#00d09c' }} />}
+                              title={<span style={{ color: tc }}>{s.founderName || 'Primary Founder'}</span>}
+                              description={<span style={{ color: '#7c8099' }}>Founder & CEO</span>}
+                            />
+                          </Card>
+                        </Col>
+                        {s.coFounders && (
+                          <Col span={12}>
+                            <Card size="small" style={{ borderRadius: 8, background: bgInner }}>
+                              <Card.Meta 
+                                avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#10b981' }} />}
+                                title={<span style={{ color: tc }}>{s.coFounders}</span>}
+                                description={<span style={{ color: '#7c8099' }}>Co-Founder</span>}
+                              />
+                            </Card>
+                          </Col>
+                        )}
+                      </Row>
+                    </div>
+                  )
+                },
+                {
+                  key: '5',
+                  label: <span style={{ fontWeight: 600 }}>Past Investors & Backers</span>,
+                  children: (
+                    <div style={{ padding: '8px 0' }}>
+                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
+                        Funding Rounds & Investment History
+                      </Text>
+                      <Table 
+                        dataSource={investments} 
+                        columns={[
+                          {
+                            title: 'Investor/Backer',
+                            dataIndex: 'investorName',
+                            key: 'investorName',
+                            render: (text) => <Text style={{ color: tc, fontWeight: 600 }}>{text}</Text>
+                          },
+                          {
+                            title: 'Amount Invested',
+                            dataIndex: 'amount',
+                            key: 'amount',
+                            render: (amt) => <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{amt.toLocaleString()}</Text>
+                          },
+                          {
+                            title: 'Date',
+                            dataIndex: 'date',
+                            key: 'date',
+                            render: (date) => <Text style={{ color: '#7c8099' }}>{new Date(date).toLocaleDateString()}</Text>
+                          },
+                          {
+                            title: 'Type',
+                            dataIndex: 'type',
+                            key: 'type',
+                            render: (type) => <Tag color={type.includes('Lead') ? 'purple' : type.includes('Accelerator') ? 'blue' : 'orange'}>{type}</Tag>
+                          }
+                        ]}
+                        pagination={{ pageSize: 5 }}
+                        size="small"
+                        rowKey={(record, index) => index}
+                        locale={{ emptyText: 'No past backing history found.' }}
+                      />
+                    </div>
+                  )
+                }
+              ]} />
+            );
+          })()
+        ) : (
+          <div style={{ padding: '40px 0', textAlign: 'center' }}>
+            <Result status="warning" title="Failed to load data" />
           </div>
         )}
       </Modal>
