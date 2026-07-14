@@ -54,7 +54,17 @@ export default function Login() {
         }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const status = response.status;
+        if (status === 404 || status >= 500) {
+          throw new Error(`The API server is currently waking up or offline (Status ${status}). Please wait a few seconds and try again.`);
+        }
+        throw new Error(`The server returned an invalid HTML page instead of JSON. Please verify that the VITE_API_URL environment variable is configured correctly on your hosting platform.`);
+      }
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
       localStorage.setItem('token', data.token);
