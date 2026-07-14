@@ -17,7 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import useIdleTimeout, { getIdleTimeoutMinutes, setIdleTimeoutMinutes } from '../hooks/useIdleTimeout';
 
-const { Header, Content } = Layout;
+const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
 
@@ -1739,6 +1739,103 @@ export default function InvestorDashboard() {
           ]}
         />
       </Content>
+
+      {/* ── Premium Platform Footer ── */}
+      <Footer style={{ 
+        background: isDarkMode ? '#0b0f19' : '#f9fafb', 
+        borderTop: `1px solid ${borderCl}`, 
+        padding: '48px 24px 24px 24px', 
+        color: tc,
+        fontFamily: 'Outfit'
+      }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          {/* Main Footer columns */}
+          <Row gutter={[32, 32]} style={{ marginBottom: 32 }}>
+            {/* Column 1: Company Logo & Details */}
+            <Col xs={24} md={6}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                <span style={{ fontSize: 24 }}>🚀</span>
+                <span style={{ fontFamily: 'Outfit', fontWeight: 900, fontSize: 22, color: '#00d09c', letterSpacing: -0.5 }}>ELEVATE</span>
+              </div>
+              <Paragraph style={{ color: tSec, fontSize: 13, lineHeight: '1.6', marginBottom: 16 }}>
+                Vaishnavi Tech Park, South Tower, 3rd Floor<br />
+                Sarjapur Main Road, Bellandur, Bengaluru – 560103<br />
+                Karnataka, India
+              </Paragraph>
+              <div style={{ marginBottom: 16 }}>
+                <Text style={{ fontWeight: 700, fontSize: 13, display: 'block', color: tc, marginBottom: 8 }}>Contact Us</Text>
+                <a href="mailto:support@elevateequity.in" style={{ color: '#00d09c', fontWeight: 600, fontSize: 13 }}>support@elevateequity.in</a>
+              </div>
+              <div>
+                <Space size={14} style={{ fontSize: 18, color: tSec }}>
+                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>𝕏</span>
+                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>📸</span>
+                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>👤</span>
+                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>💼</span>
+                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>🎥</span>
+                </Space>
+              </div>
+            </Col>
+
+            {/* Column 2: Elevate Links */}
+            <Col xs={12} sm={8} md={6}>
+              <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>ELEVATE</Title>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                <a href="#about" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>About Us</a>
+                <a href="#pricing" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Pricing</a>
+                <a href="#insights" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Venture Insights</a>
+                <a href="#media" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Media & Press</a>
+                <a href="#careers" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Careers</a>
+                <a href="#help" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Help & Support</a>
+                <a href="#safety" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Trust & Safety</a>
+                <a href="#investor-relations" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Investor Relations</a>
+              </div>
+            </Col>
+
+            {/* Column 3: Products */}
+            <Col xs={12} sm={8} md={6}>
+              <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>PRODUCTS</Title>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                <a href="#crowdfunding" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Equity Crowdfunding</a>
+                <a href="#funds" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Startup Mutual Funds</a>
+                <a href="#debt" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Venture Debt</a>
+                <a href="#secondary" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Secondary Market</a>
+                <a href="#terminal" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Elevate Terminal</a>
+                <a href="#angel" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Angel Pools</a>
+                <a href="#commodities" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Carbon Credits</a>
+                <a href="#pms" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>PMS Services</a>
+              </div>
+            </Col>
+
+            {/* Column 4: Resources / Features */}
+            <Col xs={24} sm={8} md={6}>
+              <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>RESOURCES & FEATURES</Title>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
+                <a href="#labs" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>DTU Labs Partner</a>
+                <a href="#incubator" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Startup Incubator</a>
+                <a href="#tracker" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Portfolio Tracker</a>
+                <a href="#feed" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Live Activity Feed</a>
+                <a href="#simulator" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Valuation Simulator</a>
+                <a href="#kyc" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Smart KYC Portal</a>
+                <a href="#news" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Market News Digest</a>
+                <a href="#expert" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Expert Q&A Panel</a>
+              </div>
+            </Col>
+          </Row>
+
+          <Divider style={{ borderColor: isDarkMode ? '#1f2937' : '#edf2f7', margin: '24px 0' }} />
+
+          {/* Bottom Footer Section */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              © 2016-2026 Elevate Equity. All rights reserved.
+            </Text>
+            <Text type="secondary" style={{ fontSize: 11 }}>
+              Version 1.2.4 (Antigravity Core)
+            </Text>
+          </div>
+        </div>
+      </Footer>
 
       {/* Checkout Investment Modal */}
       <Modal
