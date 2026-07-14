@@ -4,7 +4,7 @@ import { smoothToggleTheme } from '../utils/themeUtils';
 import { 
   Layout, Card, Row, Col, Statistic, Button, Modal, 
   Form, Input, InputNumber, Table, Tabs, Tag, Space, Typography, Progress, message,
-  Slider, Select, Radio, Divider, Alert, Spin, Result, Steps, Checkbox, Dropdown, Avatar, Badge
+  Slider, Select, Radio, Divider, Alert, Spin, Result, Steps, Checkbox, Dropdown, Avatar, Badge, Tooltip
 } from 'antd';
 import { 
   WalletOutlined, RiseOutlined, PieChartOutlined, 
@@ -1735,189 +1735,6 @@ export default function InvestorDashboard() {
                   />
                 </div>
               )
-            },
-            {
-              key: '5',
-              label: (
-                <span style={{ fontSize: 15, padding: '4px 8px', fontWeight: 600, color: activeTab === '5' ? '#00d09c' : '#7c8099' }}>
-                  <RiseOutlined /> LEADERBOARD & BADGES
-                </span>
-              ),
-              children: (
-                <div style={{ marginTop: 16 }}>
-                  <Row gutter={[24, 24]}>
-                    <Col xs={24} lg={12}>
-                      <Card title={<span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: tc }}>My Badges</span>} style={{ height: '100%', background: bgCard, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 16, textAlign: 'center' }}>
-                          {/* Badge 1: Angel Pioneer */}
-                          <div style={{ 
-                            padding: 12, 
-                            borderRadius: 12, 
-                            background: bgInner, 
-                            opacity: totalInvestedMyPortfolio > 0 ? 1 : 0.4,
-                            transition: 'all 0.3s',
-                            boxShadow: totalInvestedMyPortfolio > 0 ? '0 4px 10px rgba(59, 130, 246, 0.25)' : 'none',
-                            border: totalInvestedMyPortfolio > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent'
-                          }}>
-                            <Avatar size={48} style={{ backgroundColor: totalInvestedMyPortfolio > 0 ? '#3b82f6' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>👼</Avatar>
-                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Angel Pioneer</div>
-                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>First investment pledged</div>
-                          </div>
-
-                          {/* Badge 2: Whale Investor */}
-                          <div style={{ 
-                            padding: 12, 
-                            borderRadius: 12, 
-                            background: bgInner, 
-                            opacity: totalInvestedMyPortfolio >= 50000 ? 1 : 0.4,
-                            transition: 'all 0.3s',
-                            boxShadow: totalInvestedMyPortfolio >= 50000 ? '0 4px 10px rgba(234, 88, 12, 0.25)' : 'none',
-                            border: totalInvestedMyPortfolio >= 50000 ? '1px solid rgba(234, 88, 12, 0.4)' : '1px solid transparent'
-                          }}>
-                            <Avatar size={48} style={{ backgroundColor: totalInvestedMyPortfolio >= 50000 ? '#ea580c' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🐋</Avatar>
-                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Whale Investor</div>
-                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Pledge over ₹50,000</div>
-                          </div>
-
-                          {/* Badge 3: Portfolio Maestro */}
-                          <div style={{ 
-                            padding: 12, 
-                            borderRadius: 12, 
-                            background: bgInner, 
-                            opacity: myInvestments.length >= 3 ? 1 : 0.4,
-                            transition: 'all 0.3s',
-                            boxShadow: myInvestments.length >= 3 ? '0 4px 10px rgba(139, 92, 246, 0.25)' : 'none',
-                            border: myInvestments.length >= 3 ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid transparent'
-                          }}>
-                            <Avatar size={48} style={{ backgroundColor: myInvestments.length >= 3 ? '#8b5cf6' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🎻</Avatar>
-                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Portfolio Maestro</div>
-                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Invest in 3+ companies</div>
-                          </div>
-
-                          {/* Badge 4: Eco Champion */}
-                          <div style={{ 
-                            padding: 12, 
-                            borderRadius: 12, 
-                            background: bgInner, 
-                            opacity: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
-                            }) ? 1 : 0.4,
-                            transition: 'all 0.3s',
-                            boxShadow: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
-                            }) ? '0 4px 10px rgba(16, 185, 129, 0.25)' : 'none',
-                            border: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
-                            }) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
-                          }}>
-                            <Avatar size={48} style={{ backgroundColor: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
-                            }) ? '#10b981' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🌿</Avatar>
-                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Eco Champion</div>
-                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Support Green/Clean Tech</div>
-                          </div>
-
-                          {/* Badge 5: Tech Pioneer */}
-                          <div style={{ 
-                            padding: 12, 
-                            borderRadius: 12, 
-                            background: bgInner, 
-                            opacity: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
-                            }) ? 1 : 0.4,
-                            transition: 'all 0.3s',
-                            boxShadow: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
-                            }) ? '0 4px 10px rgba(236, 72, 153, 0.25)' : 'none',
-                            border: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
-                            }) ? '1px solid rgba(236, 72, 153, 0.4)' : '1px solid transparent'
-                          }}>
-                            <Avatar size={48} style={{ backgroundColor: myInvestments.some(inv => {
-                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
-                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
-                            }) ? '#ec4899' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🤖</Avatar>
-                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Tech Pioneer</div>
-                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Support Advanced Tech</div>
-                          </div>
-                        </div>
-                      </Card>
-                    </Col>
-                    
-                    <Col xs={24} lg={12}>
-                      <Card title={<span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: tc }}>Leaderboard (Top Investors)</span>} style={{ background: bgCard, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
-                        <Table
-                          pagination={false}
-                          dataSource={[
-                            { rank: 1, name: 'Siddharth M.', amount: 245000, deals: 8, ROI: '+42%', avatar: '👨‍💼' },
-                            { rank: 2, name: 'Priya Sharma', amount: 180000, deals: 6, ROI: '+35%', avatar: '👩‍💼' },
-                            { rank: 3, name: 'Kunal Kapoor', amount: 125000, deals: 4, ROI: '+28%', avatar: '👨‍💻' },
-                            { 
-                              rank: totalInvestedMyPortfolio > 125000 ? 3 : (totalInvestedMyPortfolio > 0 ? 4 : '100+'),
-                              name: currentUser?.name || 'You', 
-                              amount: totalInvestedMyPortfolio, 
-                              deals: myInvestments.length, 
-                              ROI: totalInvestedMyPortfolio > 0 ? '+15%' : '0%', 
-                              avatar: '🚀',
-                              isMe: true 
-                            },
-                            { rank: 4, name: 'Ananya Goel', amount: 95000, deals: 5, ROI: '+21%', avatar: '👩‍🎨' },
-                            { rank: 5, name: 'Rohan Verma', amount: 75000, deals: 3, ROI: '+18%', avatar: '👨‍🚀' }
-                          ].sort((a, b) => b.amount - a.amount).map((item, idx) => ({ ...item, rank: idx + 1 }))}
-                          columns={[
-                            { 
-                              title: 'Rank', 
-                              dataIndex: 'rank', 
-                              render: (val, record) => (
-                                <span style={{ 
-                                  fontWeight: 800, 
-                                  color: record.isMe ? '#00d09c' : (val === 1 ? '#eab308' : val === 2 ? '#94a3b8' : val === 3 ? '#b45309' : tc)
-                                }}>
-                                  #{val}
-                                </span>
-                              )
-                            },
-                            { 
-                              title: 'Investor', 
-                              dataIndex: 'name', 
-                              render: (val, record) => (
-                                <Space>
-                                  <span>{record.avatar}</span>
-                                  <span style={{ fontWeight: record.isMe ? 800 : 500, color: record.isMe ? '#00d09c' : tc }}>
-                                    {val} {record.isMe && '(You)'}
-                                  </span>
-                                </Space>
-                              )
-                            },
-                            { 
-                              title: 'Capital Deployed', 
-                              dataIndex: 'amount', 
-                              render: (val) => `₹${val.toLocaleString()}` 
-                            },
-                            { 
-                              title: 'Deals', 
-                              dataIndex: 'deals' 
-                            },
-                            { 
-                              title: 'ROI Growth', 
-                              dataIndex: 'ROI',
-                              render: (val) => <span style={{ color: '#10b981', fontWeight: 700 }}>{val}</span>
-                            }
-                          ]}
-                          rowClassName={(record) => record.isMe ? 'leaderboard-me-row' : ''}
-                        />
-                      </Card>
-                    </Col>
-                  </Row>
-                </div>
-              )
             }
           ]}
         />
@@ -3030,6 +2847,138 @@ export default function InvestorDashboard() {
                 rows={2}
                 style={{ borderRadius: 8, background: isDarkMode ? '#121620' : '#ffffff', color: tc, border: `1px solid ${borderCl}` }}
               />
+            </div>
+          </div>
+
+          {/* Achievements & Badges Section */}
+          <div style={{ background: bgInner, padding: 14, borderRadius: 10, border: `1px solid ${borderCl}`, marginBottom: 14 }}>
+            <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: '0 0 4px 0', fontSize: 14 }}>
+              My Achievements & Badges
+            </Title>
+            <Text type="secondary" style={{ fontSize: 11, display: 'block', marginBottom: 12 }}>
+              Click on any badge to view the unlock requirements and status.
+            </Text>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, textAlign: 'center' }}>
+              {[
+                {
+                  id: 'angel',
+                  name: 'Angel Pioneer',
+                  emoji: '👼',
+                  color: '#3b82f6',
+                  description: 'First investment pledged',
+                  criteria: 'Pledge capital to at least one startup listing on Elevate.',
+                  earned: totalInvestedMyPortfolio > 0
+                },
+                {
+                  id: 'whale',
+                  name: 'Whale Investor',
+                  emoji: '🐋',
+                  color: '#ea580c',
+                  description: 'Pledge over ₹50,000',
+                  criteria: 'Invest an aggregate of ₹50,000 or more across any startup listings on the platform.',
+                  earned: totalInvestedMyPortfolio >= 50000
+                },
+                {
+                  id: 'maestro',
+                  name: 'Portfolio Maestro',
+                  emoji: '🎻',
+                  color: '#8b5cf6',
+                  description: 'Invest in 3+ companies',
+                  criteria: 'Diversify your portfolio by investing in 3 or more unique startup listings.',
+                  earned: myInvestments.length >= 3
+                },
+                {
+                  id: 'eco',
+                  name: 'Eco Champion',
+                  emoji: '🌿',
+                  color: '#10b981',
+                  description: 'Support Green/Clean Tech',
+                  criteria: 'Back at least one startup categorized under sustainable technology, clean energy, agricultural automation, or water purification.',
+                  earned: myInvestments.some(inv => {
+                    const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                    return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
+                  })
+                },
+                {
+                  id: 'tech',
+                  name: 'Tech Pioneer',
+                  emoji: '🤖',
+                  color: '#ec4899',
+                  description: 'Support Advanced Tech',
+                  criteria: 'Back at least one startup leading the frontier in artificial intelligence, robotics, VR, quantum computing, or bionics.',
+                  earned: myInvestments.some(inv => {
+                    const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                    return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
+                  })
+                }
+              ].map(badge => (
+                <Tooltip title={badge.earned ? `Unlocked: ${badge.name}` : `Locked: ${badge.name}`} key={badge.id}>
+                  <div 
+                    onClick={() => {
+                      Modal.info({
+                        title: (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'Outfit', fontWeight: 800, fontSize: 16 }}>
+                            <span style={{ fontSize: 24 }}>{badge.emoji}</span>
+                            <span style={{ color: tc }}>{badge.name}</span>
+                          </div>
+                        ),
+                        content: (
+                          <div style={{ marginTop: 8 }}>
+                            <div style={{ marginBottom: 12 }}>
+                              <Tag color={badge.earned ? 'green' : 'default'} style={{ fontWeight: 700 }}>
+                                {badge.earned ? 'UNLOCKED' : 'LOCKED'}
+                              </Tag>
+                            </div>
+                            <Text style={{ fontSize: 13, display: 'block', marginBottom: 8, fontWeight: 500, color: tc }}>
+                              {badge.description}
+                            </Text>
+                            <div style={{ background: isDarkMode ? '#111827' : '#f9fafb', padding: '10px 12px', borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                              <Text type="secondary" style={{ fontSize: 10, fontWeight: 700, display: 'block', textTransform: 'uppercase', marginBottom: 4 }}>
+                                Unlock Criteria:
+                              </Text>
+                              <Text style={{ fontSize: 12, color: tc }}>
+                                {badge.criteria}
+                              </Text>
+                            </div>
+                          </div>
+                        ),
+                        okText: 'Close',
+                        okButtonProps: {
+                          style: { backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6 }
+                        },
+                        maskClosable: true,
+                        style: { borderRadius: 12 }
+                      });
+                    }}
+                    style={{ 
+                      padding: '8px 4px', 
+                      borderRadius: 8, 
+                      background: isDarkMode ? '#111827' : '#ffffff', 
+                      border: badge.earned ? `1px solid ${badge.color}` : `1px solid ${borderCl}`,
+                      opacity: badge.earned ? 1 : 0.4,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      boxShadow: badge.earned ? `0 2px 6px ${badge.color}25` : 'none',
+                    }}
+                  >
+                    <Avatar 
+                      size={32} 
+                      style={{ 
+                        backgroundColor: badge.earned ? badge.color : '#cbd5e1', 
+                        color: '#fff', 
+                        fontSize: 14,
+                        margin: '0 auto',
+                        filter: badge.earned ? 'none' : 'grayscale(100%)'
+                      }}
+                    >
+                      {badge.emoji}
+                    </Avatar>
+                    <div style={{ fontWeight: 700, fontSize: 9, marginTop: 6, color: tc, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {badge.name.split(' ')[0]}
+                    </div>
+                  </div>
+                </Tooltip>
+              ))}
             </div>
           </div>
 
