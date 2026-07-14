@@ -126,6 +126,36 @@ const infoTopics = {
     title: 'Expert Q&A Panels',
     category: 'RESOURCES',
     content: 'Connect with veteran VCs, startup lawyers, and tax experts through our weekly Q&A panels. Ask questions about equity taxation, cap table legal structures, or diligence best practices.\n\nAll panels are recorded and archived for on-demand streaming.'
+  },
+  'social-twitter': {
+    title: 'Elevate on X (Twitter)',
+    category: 'SOCIAL MEDIA',
+    content: 'Follow our official channel @ElevateEquity on X (formerly Twitter) for breaking startup updates, live crowdfunding campaign listings, investor poll results, and daily venture capital industry commentary.\n\nJoin our community of over 50,000 founders and investors who debate macro trends and track platform progress in real-time.'
+  },
+  'social-instagram': {
+    title: 'Elevate on Instagram',
+    category: 'SOCIAL MEDIA',
+    content: 'Behind-the-scenes founder stories, startup office tours, pitch highlights, and visually stunning venture summaries. Follow @ElevateEquity for our curated visual gallery and live video Q&A streams.'
+  },
+  'social-facebook': {
+    title: 'Elevate on Facebook',
+    category: 'SOCIAL MEDIA',
+    content: 'Connect with our community of retail and angel investors. Join our Facebook groups to exchange diligence insights, ask general onboarding questions, and RSVP to weekly investment masterclasses.'
+  },
+  'social-linkedin': {
+    title: 'Elevate on LinkedIn',
+    category: 'SOCIAL MEDIA',
+    content: 'Follow Elevate Equity on LinkedIn for professional announcements, strategic corporate updates, senior executive hires, career listings, and DTU Labs research partnership news.'
+  },
+  'social-youtube': {
+    title: 'Elevate on YouTube',
+    category: 'SOCIAL MEDIA',
+    content: 'Watch detailed startup pitch videos, deep-dive technical diligence webinars, and tutorial guides on how to navigate equity crowdfunding.\n\nSubscribe to our channel to get notifications whenever a new founder interview or cap table masterclass is uploaded.'
+  },
+  'contact-us': {
+    title: 'Contact Elevate Equity Support',
+    category: 'SUPPORT',
+    content: 'Get in touch with us at corporate headquarters or submit a support query. Our physical office is located at Vaishnavi Tech Park, South Tower, 3rd Floor, Sarjapur Main Road, Bellandur, Bengaluru – 560103, Karnataka, India.\n\nFor support, email us at support@elevateequity.in or call +91-80-ELEVATE.'
   }
 };
 

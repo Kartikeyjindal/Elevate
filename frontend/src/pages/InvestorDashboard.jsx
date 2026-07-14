@@ -1763,16 +1763,16 @@ export default function InvestorDashboard() {
                 Karnataka, India
               </Paragraph>
               <div style={{ marginBottom: 16 }}>
-                <Text style={{ fontWeight: 700, fontSize: 13, display: 'block', color: tc, marginBottom: 8 }}>Contact Us</Text>
-                <a href="mailto:support@elevateequity.in" style={{ color: '#00d09c', fontWeight: 600, fontSize: 13 }}>support@elevateequity.in</a>
+                <Link to="/investor/info/contact-us" style={{ fontWeight: 700, fontSize: 13, display: 'block', color: tc, marginBottom: 8 }}>Contact Us</Link>
+                <Link to="/investor/info/contact-us" style={{ color: '#00d09c', fontWeight: 600, fontSize: 13 }}>support@elevateequity.in</Link>
               </div>
               <div>
                 <Space size={14} style={{ fontSize: 18, color: tSec }}>
-                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>𝕏</span>
-                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>📸</span>
-                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>👤</span>
-                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>💼</span>
-                  <span style={{ cursor: 'pointer', transition: 'color 0.2s' }}>🎥</span>
+                  <Link to="/investor/info/social-twitter" style={{ color: 'inherit' }}>𝕏</Link>
+                  <Link to="/investor/info/social-instagram" style={{ color: 'inherit' }}>📸</Link>
+                  <Link to="/investor/info/social-facebook" style={{ color: 'inherit' }}>👤</Link>
+                  <Link to="/investor/info/social-linkedin" style={{ color: 'inherit' }}>💼</Link>
+                  <Link to="/investor/info/social-youtube" style={{ color: 'inherit' }}>🎥</Link>
                 </Space>
               </div>
             </Col>
