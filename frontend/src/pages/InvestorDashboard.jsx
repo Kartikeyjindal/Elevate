@@ -2912,7 +2912,19 @@ export default function InvestorDashboard() {
                   })
                 }
               ].map(badge => (
-                <Tooltip title={badge.earned ? `Unlocked: ${badge.name}` : `Locked: ${badge.name}`} key={badge.id}>
+                <Tooltip 
+                  title={
+                    <div style={{ padding: '4px' }}>
+                      <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '4px' }}>
+                        {badge.emoji} {badge.name} ({badge.earned ? 'Unlocked' : 'Locked'})
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.85)', lineHeight: '1.4' }}>
+                        {badge.criteria}
+                      </div>
+                    </div>
+                  } 
+                  key={badge.id}
+                >
                   <div 
                     onClick={() => {
                       Modal.info({
