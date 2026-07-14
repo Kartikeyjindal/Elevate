@@ -4,7 +4,7 @@ import { smoothToggleTheme } from '../utils/themeUtils';
 import { 
   Layout, Card, Row, Col, Statistic, Button, Modal, 
   Form, Input, InputNumber, Table, Tabs, Tag, Space, Typography, Progress, message,
-  Select, Radio, Divider, Alert, Spin, Result, Steps, Checkbox, Dropdown, Avatar, Badge
+  Slider, Select, Radio, Divider, Alert, Spin, Result, Steps, Checkbox, Dropdown, Avatar, Badge
 } from 'antd';
 import { 
   WalletOutlined, RiseOutlined, PieChartOutlined, 
@@ -75,7 +75,7 @@ function Sparkline({ data }) {
 }
 
 // Groww-style Mint Green Valuation Sparkline Component
-function ValuationSparkline({ data }) {
+function ValuationSparkline({ data, projectionCount = 0 }) {
   if (!data || data.length < 2) return null;
   const width = 600;
   const height = 150;
@@ -86,13 +86,19 @@ function ValuationSparkline({ data }) {
   const points = data.map((val, idx) => {
     const x = (idx / (data.length - 1)) * width;
     const y = height - ((val - min) / range) * (height - 30) - 15;
-    return `${x},${y}`;
+    return { x, y, val };
   });
-  
-  const pathData = `M ${points.join(' L ')}`;
+
+  const historicalPoints = points.slice(0, points.length - projectionCount);
+  const projectedPoints = points.slice(points.length - projectionCount - 1);
+
+  const historicalPath = historicalPoints.length > 0 ? `M ${historicalPoints.map(p => `${p.x},${p.y}`).join(' L ')}` : '';
+  const projectedPath = projectedPoints.length > 0 ? `M ${projectedPoints.map(p => `${p.x},${p.y}`).join(' L ')}` : '';
+
   const gradId = `valuation-spark-grad-${Math.floor(Math.random() * 1000000)}`;
   const strokeColor = '#00d09c'; // Groww Green
-  
+  const projectedColor = '#ea580c'; // Warm Orange
+
   const formatCurrencyShort = (val) => {
     if (val >= 10000000) {
       return `₹${(val / 10000000).toFixed(1)} Cr`;
@@ -104,52 +110,99 @@ function ValuationSparkline({ data }) {
   };
 
   return (
-    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
-          <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path
-        d={`${pathData} L ${width},${height} L 0,${height} Z`}
-        fill={`url(#${gradId})`}
-      />
-      <path
-        d={pathData}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {data.map((val, idx) => {
-        const x = (idx / (data.length - 1)) * width;
-        const y = height - ((val - min) / range) * (height - 30) - 15;
-        return (
-          <g key={idx}>
-            <circle
-              cx={x}
-              cy={y}
-              r="4.5"
-              fill={strokeColor}
-              stroke="#fff"
-              strokeWidth="2"
-            />
-            <text
-              x={x}
-              y={y - 12}
-              textAnchor="middle"
-              fill="#7c8099"
-              fontSize="10"
-              fontWeight="600"
-            >
-              {formatCurrencyShort(val)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{ position: 'relative' }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.2" />
+            <stop offset="100%" stopColor={strokeColor} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        
+        {/* Full area fill under line */}
+        {points.length > 0 && (
+          <path
+            d={`M ${points.map(p => `${p.x},${p.y}`).join(' L ')} L ${width},${height} L 0,${height} Z`}
+            fill={`url(#${gradId})`}
+          />
+        )}
+
+        {/* Historical Line */}
+        {historicalPath && (
+          <path
+            d={historicalPath}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+
+        {/* Projected Line */}
+        {projectedPath && projectionCount > 0 && (
+          <path
+            d={projectedPath}
+            fill="none"
+            stroke={projectedColor}
+            strokeWidth="3"
+            strokeDasharray="6,4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+
+        {/* Points and Labels */}
+        {points.map((pt, idx) => {
+          const isProjected = idx >= data.length - projectionCount;
+          const color = isProjected ? projectedColor : strokeColor;
+          return (
+            <g key={idx}>
+              <circle
+                cx={pt.x}
+                cy={pt.y}
+                r={isProjected ? "5" : "4.5"}
+                fill={color}
+                stroke="#fff"
+                strokeWidth="2"
+              />
+              <text
+                x={pt.x}
+                y={pt.y - 12}
+                textAnchor="middle"
+                fill={isProjected ? projectedColor : "#7c8099"}
+                fontSize="10"
+                fontWeight={isProjected ? "700" : "600"}
+              >
+                {formatCurrencyShort(pt.val)}
+              </text>
+              <text
+                x={pt.x}
+                y={height - 2}
+                textAnchor="middle"
+                fill="#9ca3af"
+                fontSize="8"
+                fontWeight="500"
+              >
+                {isProjected ? `Round +${idx - (data.length - projectionCount - 1)}` : `Round ${idx + 1}`}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {projectionCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 12, fontSize: 11 }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#7c8099' }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: strokeColor }}></span>
+            Historical
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, color: '#7c8099' }}>
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', backgroundColor: projectedColor }}></span>
+            Projected
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -172,6 +225,64 @@ export default function InvestorDashboard() {
   const [blogs, setBlogs] = useState([]);
   const [marketNews, setMarketNews] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
+
+  // States for Dynamic Valuation Sliders & Live Activity Feed
+  const [projectionGrowth, setProjectionGrowth] = useState(25);
+  const [projectionRetention, setProjectionRetention] = useState(85);
+  const [activityFeed, setActivityFeed] = useState([
+    { id: 1, title: 'Investment', message: 'Rohan K. invested ₹20,000 in BOXABL', time: '1m ago', color: '#00d09c' },
+    { id: 2, title: 'Milestone', message: 'Greenfield Robotics hit 70% of funding target', time: '3m ago', color: '#fbbf24' },
+    { id: 3, title: 'Listing Approved', message: 'SapientX approved for retail investment', time: '5m ago', color: '#3b82f6' },
+    { id: 4, title: 'Deposit', message: 'Aanya S. deposited ₹1,00,000 to wallet', time: '8m ago', color: '#10b981' },
+    { id: 5, title: 'Valuation Update', message: 'Trade Algo valuation increased to ₹120 Cr', time: '12m ago', color: '#8b5cf6' }
+  ]);
+
+  // Hook for simulating live activity feed ticker
+  useEffect(() => {
+    if (!startups || startups.length === 0) return;
+    const mockFirstNames = ['Aditya', 'Neha', 'Sanjay', 'Priya', 'Kunal', 'Deepak', 'Siddharth', 'Ananya', 'Rohan', 'Aarav'];
+    const mockLastNames = ['Sharma', 'Verma', 'Patel', 'Goel', 'Kapoor', 'Mehta', 'Kumar', 'Sen', 'Dutt', 'Singh'];
+    const mockAmounts = [5000, 10000, 15000, 25000, 50000, 100000];
+    
+    const interval = setInterval(() => {
+      const randomStartup = startups[Math.floor(Math.random() * startups.length)];
+      const randomName = `${mockFirstNames[Math.floor(Math.random() * mockFirstNames.length)]} ${mockLastNames[Math.floor(Math.random() * mockLastNames.length)].charAt(0)}.`;
+      const randomAmount = mockAmounts[Math.floor(Math.random() * mockAmounts.length)];
+      
+      const eventTypes = [
+        {
+          title: 'Investment',
+          message: `${randomName} invested ₹${randomAmount.toLocaleString()} in ${randomStartup.name}`,
+          color: '#00d09c'
+        },
+        {
+          title: 'Wallet Deposit',
+          message: `${randomName} deposited ₹${randomAmount.toLocaleString()} to wallet`,
+          color: '#10b981'
+        },
+        {
+          title: 'Goal Progress',
+          message: `${randomStartup.name} is now at ${Math.min(99, Math.floor(50 + Math.random() * 45))}% of their target`,
+          color: '#fbbf24'
+        }
+      ];
+      
+      const selectedEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+      
+      setActivityFeed(prev => [
+        {
+          id: Date.now(),
+          title: selectedEvent.title,
+          message: selectedEvent.message,
+          time: 'Just now',
+          color: selectedEvent.color
+        },
+        ...prev.slice(0, 7)
+      ]);
+    }, 15000);
+    
+    return () => clearInterval(interval);
+  }, [startups]);
 
   // Theme Toggler state
   const [isDarkMode, setIsDarkMode] = useState(
@@ -730,6 +841,8 @@ export default function InvestorDashboard() {
     setCompanyDetailsVisible(true);
     setCompanyDetailsLoading(true);
     setCompanyDetailsData(null);
+    setProjectionGrowth(25);
+    setProjectionRetention(85);
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_URL}/api/startups/${startup._id}/details`, {
@@ -791,6 +904,16 @@ export default function InvestorDashboard() {
       s._id === selectedStartup._id ? { ...s, raisedAmount: (s.raisedAmount || 0) + investAmount } : s
     ));
     setInvestModalVisible(false);
+    setActivityFeed(prev => [
+      {
+        id: Date.now(),
+        title: 'Your Investment',
+        message: `You invested ₹${investAmount.toLocaleString()} in ${selectedStartup.name}!`,
+        time: 'Just now',
+        color: '#ec4899'
+      },
+      ...prev
+    ]);
 
     try {
       const res = await fetch(`${API_URL}/api/invest`, {
@@ -1192,194 +1315,234 @@ export default function InvestorDashboard() {
                     </Col>
                   </Row>
 
-                  {/* Marketplace list */}
-                  <Row gutter={[20, 20]}>
-                    {filteredStartups.length === 0 ? (
-                      <Col span={24}>
-                        <Card style={{ textAlign: 'center', padding: 48 }}>
-                          <Text style={{ color: '#7c8099', fontSize: 15 }}>No matching startups found. Try another query.</Text>
-                        </Card>
-                      </Col>
-                    ) : (
-                      filteredStartups.map(startup => {
-                        const targetFunding = startup.targetGoal || 10000000;
-                        const raisedProgress = Math.min(100, Math.round(((startup.raisedAmount || 0) / targetFunding) * 100));
-                        
-                        return (
-                          <Col xs={24} md={12} lg={8} key={startup._id}>
-                            <Card 
-                              cover={
-                                <div style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
-                                  <img 
-                                    alt={startup.name} 
-                                    src={startup.logoUrl || "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80"} 
-                                    style={{ 
-                                      width: '100%', 
-                                      height: '100%', 
-                                      objectFit: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? 'contain' : 'cover',
-                                      background: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) 
-                                        ? (startup.logoUrl.includes('Raised_Type') ? '#0f172a' : (isDarkMode ? '#1e293b' : '#f8fafc')) 
-                                        : 'transparent',
-                                      padding: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? '12px' : '0px'
-                                    }}
-                                  />
-                                  <div style={{
-                                    position: 'absolute',
-                                    top: 12,
-                                    left: 12,
-                                    background: 'rgba(0, 0, 0, 0.65)',
-                                    backdropFilter: 'blur(4px)',
-                                    padding: '4px 10px',
-                                    borderRadius: '4px',
-                                    color: '#fff',
-                                    fontWeight: 600,
-                                    fontSize: 11
-                                  }}>
-                                    {startup.category}
-                                  </div>
-                                  {startup.daysLeft === 0 && (
-                                    <div style={{
-                                      position: 'absolute',
-                                      top: 12,
-                                      right: 12,
-                                      background: '#10b981',
-                                      padding: '4px 10px',
-                                      borderRadius: '4px',
-                                      color: '#fff',
-                                      fontWeight: 700,
-                                      fontSize: 11,
-                                      textTransform: 'uppercase'
-                                    }}>
-                                      Funded
-                                    </div>
-                                  )}
-                                </div>
-                              }
-                              style={{ overflow: 'hidden', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', background: isDarkMode ? '#111827' : '#ffffff' }}
-                              bodyStyle={{ padding: 20 }}
-                            >
-                              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
-                                <Title 
-                                  level={4} 
-                                  style={{ 
-                                    color: isDarkMode ? '#f1f5f9' : '#1e293b', 
-                                    margin: 0, 
-                                    fontFamily: 'Outfit', 
-                                    fontWeight: 800, 
-                                    fontSize: 18,
-                                    cursor: 'pointer'
-                                  }}
-                                  onClick={() => handleOpenCompanyDetails(startup)}
-                                  onMouseEnter={(e) => e.target.style.color = '#00d09c'}
-                                  onMouseLeave={(e) => e.target.style.color = isDarkMode ? '#f1f5f9' : '#1e293b'}
-                                >
-                                  {startup.name}
-                                </Title>
-                              </div>
-                              
-                              <Paragraph ellipsis={{ rows: 2 }} style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 13, minHeight: 40, marginBottom: 16 }}>
-                                {startup.tagline}
-                              </Paragraph>
-
-                              {/* Progress bar */}
-                              <div style={{ marginBottom: 16 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                  <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
-                                    ₹{(startup.raisedAmount || 0).toLocaleString()}
-                                  </Text>
-                                  <Text style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 12, fontWeight: 600 }}>
-                                    {raisedProgress}% of target
-                                  </Text>
-                                </div>
-                                <Progress 
-                                  percent={raisedProgress} 
-                                  showInfo={false} 
-                                  strokeColor="#00d09c"
-                                  trailColor={isDarkMode ? '#374151' : '#f1f5f9'}
-                                  strokeWidth={6}
-                                />
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                                  <Text type="secondary" style={{ fontSize: 11 }}>{startup.totalInvestors?.toLocaleString() || 0} investors</Text>
-                                  <Text type="secondary" style={{ fontSize: 11 }}>Target: ₹{targetFunding.toLocaleString()}</Text>
-                                </div>
-                              </div>
-
-                              {/* Financial metrics grid */}
-                              <Row gutter={[8, 8]} style={{ 
-                                background: isDarkMode ? '#1f2937' : '#f8fafc', 
-                                padding: '12px', 
-                                borderRadius: 8,
-                                border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7',
-                                marginBottom: 16
-                              }}>
-                                <Col span={12}>
-                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Min. Investment</Text>
-                                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>₹{(startup.minimumInvestment || 0).toLocaleString()}</Text>
-                                </Col>
-                                <Col span={12}>
-                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Valuation Cap</Text>
-                                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
-                                    ₹{(startup.valuationCap || startup.pastValuations?.[startup.pastValuations.length - 1] || 0).toLocaleString()}
-                                  </Text>
-                                </Col>
-                                <Col span={12} style={{ marginTop: 8 }}>
-                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Security Type</Text>
-                                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 12, fontWeight: 600 }}>{startup.securityType || 'Crowd SAFE'}</Text>
-                                </Col>
-                                <Col span={12} style={{ marginTop: 8 }}>
-                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Days Left</Text>
-                                  <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
-                                    {startup.daysLeft > 0 ? `${startup.daysLeft} days` : 'Closed'}
-                                  </Text>
-                                </Col>
-                              </Row>
-
-                              {/* Venture Details (Expandable) */}
-                              {expandedStartupId === startup._id && (
-                                <div className="fade-in-section" style={{ borderTop: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', paddingTop: 16, marginBottom: 16 }}>
-                                  <div style={{ marginBottom: 12 }}>
-                                    <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>MARKETING STRATEGY (4 Ps)</Text>
-                                    <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.marketingMixVariables}</Paragraph>
-                                  </div>
-                                  <div>
-                                    <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>BUDGETING & SUPPLY CHAIN</Text>
-                                    <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.financialProcurement}</Paragraph>
-                                  </div>
-                                </div>
-                              )}
-
-                              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                <Button 
-                                  type="text" 
-                                  icon={<InfoCircleOutlined />}
-                                  onClick={() => toggleExpandStartup(startup._id)}
-                                  style={{ color: '#7c8099', fontSize: 13 }}
-                                >
-                                  {expandedStartupId === startup._id ? 'Hide Details' : 'Venture Details'}
-                                </Button>
-                                <Button 
-                                  type="primary" 
-                                  icon={<DollarOutlined />}
-                                  disabled={startup.daysLeft === 0}
-                                  onClick={() => handleOpenInvestModal(startup)}
-                                  style={{
-                                    backgroundColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
-                                    borderColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
-                                    color: '#fff',
-                                    borderRadius: 8,
-                                    height: 38,
-                                    fontWeight: 700,
-                                    boxShadow: 'none'
-                                  }}
-                                >
-                                  {startup.daysLeft === 0 ? 'Closed' : 'Invest'}
-                                </Button>
-                              </Space>
+                  {/* Two Column Layout: Marketplace Grid & Live Ticker */}
+                  <Row gutter={[24, 24]}>
+                    <Col xs={24} lg={18}>
+                      <Row gutter={[20, 20]}>
+                        {filteredStartups.length === 0 ? (
+                          <Col span={24}>
+                            <Card style={{ textAlign: 'center', padding: 48 }}>
+                              <Text style={{ color: '#7c8099', fontSize: 15 }}>No matching startups found. Try another query.</Text>
                             </Card>
                           </Col>
-                        );
-                      })
-                    )}
+                        ) : (
+                          filteredStartups.map(startup => {
+                            const targetFunding = startup.targetGoal || 10000000;
+                            const raisedProgress = Math.min(100, Math.round(((startup.raisedAmount || 0) / targetFunding) * 100));
+                            
+                            return (
+                              <Col xs={24} md={12} key={startup._id}>
+                                <Card 
+                                  cover={
+                                    <div style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
+                                      <img 
+                                        alt={startup.name} 
+                                        src={startup.logoUrl || "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80"} 
+                                        style={{ 
+                                          width: '100%', 
+                                          height: '100%', 
+                                          objectFit: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? 'contain' : 'cover',
+                                          background: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) 
+                                            ? (startup.logoUrl.includes('Raised_Type') ? '#0f172a' : (isDarkMode ? '#1e293b' : '#f8fafc')) 
+                                            : 'transparent',
+                                          padding: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? '12px' : '0px'
+                                        }}
+                                      />
+                                      <div style={{
+                                        position: 'absolute',
+                                        top: 12,
+                                        left: 12,
+                                        background: 'rgba(0, 0, 0, 0.65)',
+                                        backdropFilter: 'blur(4px)',
+                                        padding: '4px 10px',
+                                        borderRadius: '4px',
+                                        color: '#fff',
+                                        fontWeight: 600,
+                                        fontSize: 11
+                                      }}>
+                                        {startup.category}
+                                      </div>
+                                      {startup.daysLeft === 0 && (
+                                        <div style={{
+                                          position: 'absolute',
+                                          top: 12,
+                                          right: 12,
+                                          background: '#10b981',
+                                          padding: '4px 10px',
+                                          borderRadius: '4px',
+                                          color: '#fff',
+                                          fontWeight: 700,
+                                          fontSize: 11,
+                                          textTransform: 'uppercase'
+                                        }}>
+                                          Funded
+                                        </div>
+                                      )}
+                                    </div>
+                                  }
+                                  style={{ overflow: 'hidden', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', background: isDarkMode ? '#111827' : '#ffffff', height: '100%' }}
+                                  bodyStyle={{ padding: 20 }}
+                                >
+                                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+                                        <Title 
+                                          level={4} 
+                                          style={{ 
+                                            color: isDarkMode ? '#f1f5f9' : '#1e293b', 
+                                            margin: 0, 
+                                            fontFamily: 'Outfit', 
+                                            fontWeight: 800, 
+                                            fontSize: 18,
+                                            cursor: 'pointer'
+                                          }}
+                                          onClick={() => handleOpenCompanyDetails(startup)}
+                                        >
+                                          {startup.name}
+                                        </Title>
+                                      </div>
+                                      
+                                      <Paragraph ellipsis={{ rows: 2 }} style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 13, minHeight: 40, marginBottom: 16 }}>
+                                        {startup.tagline}
+                                      </Paragraph>
+                                    </div>
+
+                                    <div>
+                                      {/* Progress bar */}
+                                      <div style={{ marginBottom: 16 }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                          <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
+                                            ₹{(startup.raisedAmount || 0).toLocaleString()}
+                                          </Text>
+                                          <Text style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 12, fontWeight: 600 }}>
+                                            {raisedProgress}% of target
+                                          </Text>
+                                        </div>
+                                        <Progress 
+                                          percent={raisedProgress} 
+                                          showInfo={false} 
+                                          strokeColor="#00d09c"
+                                          trailColor={isDarkMode ? '#374151' : '#f1f5f9'}
+                                          strokeWidth={6}
+                                        />
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                                          <Text type="secondary" style={{ fontSize: 11 }}>{startup.totalInvestors?.toLocaleString() || 0} investors</Text>
+                                          <Text type="secondary" style={{ fontSize: 11 }}>Target: ₹{targetFunding.toLocaleString()}</Text>
+                                        </div>
+                                      </div>
+
+                                      {/* Financial metrics grid */}
+                                      <Row gutter={[8, 8]} style={{ 
+                                        background: bgInner, 
+                                        padding: '12px', 
+                                        borderRadius: 8,
+                                        border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7',
+                                        marginBottom: 16
+                                      }}>
+                                        <Col span={12}>
+                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Min. Investment</Text>
+                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>₹{(startup.minimumInvestment || 0).toLocaleString()}</Text>
+                                        </Col>
+                                        <Col span={12}>
+                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Valuation Cap</Text>
+                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
+                                            ₹{(startup.valuationCap || startup.pastValuations?.[startup.pastValuations.length - 1] || 0).toLocaleString()}
+                                          </Text>
+                                        </Col>
+                                        <Col span={12} style={{ marginTop: 8 }}>
+                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Security Type</Text>
+                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 12, fontWeight: 600 }}>{startup.securityType || 'Crowd SAFE'}</Text>
+                                        </Col>
+                                        <Col span={12} style={{ marginTop: 8 }}>
+                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Days Left</Text>
+                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
+                                            {startup.daysLeft > 0 ? `${startup.daysLeft} days` : 'Closed'}
+                                          </Text>
+                                        </Col>
+                                      </Row>
+
+                                      {/* Venture Details (Expandable) */}
+                                      {expandedStartupId === startup._id && (
+                                        <div className="fade-in-section" style={{ borderTop: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', paddingTop: 16, marginBottom: 16 }}>
+                                          <div style={{ marginBottom: 12 }}>
+                                            <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>MARKETING STRATEGY (4 Ps)</Text>
+                                            <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.marketingMixVariables}</Paragraph>
+                                          </div>
+                                          <div>
+                                            <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>BUDGETING & SUPPLY CHAIN</Text>
+                                            <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.financialProcurement}</Paragraph>
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                        <Button 
+                                          type="text" 
+                                          icon={<InfoCircleOutlined />}
+                                          onClick={() => toggleExpandStartup(startup._id)}
+                                          style={{ color: '#7c8099', fontSize: 13 }}
+                                        >
+                                          {expandedStartupId === startup._id ? 'Hide Details' : 'Venture Details'}
+                                        </Button>
+                                        <Button 
+                                          type="primary" 
+                                          icon={<DollarOutlined />}
+                                          disabled={startup.daysLeft === 0}
+                                          onClick={() => handleOpenInvestModal(startup)}
+                                          style={{
+                                            backgroundColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
+                                            borderColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
+                                            color: '#fff',
+                                            borderRadius: 8,
+                                            height: 38,
+                                            fontWeight: 700,
+                                            boxShadow: 'none'
+                                          }}
+                                        >
+                                          {startup.daysLeft === 0 ? 'Closed' : 'Invest'}
+                                        </Button>
+                                      </Space>
+                                    </div>
+                                  </div>
+                                </Card>
+                              </Col>
+                            );
+                          })
+                        )}
+                      </Row>
+                    </Col>
+                    
+                    {/* Live Ticker column */}
+                    <Col xs={24} lg={6}>
+                      <Card 
+                        title={
+                          <Space>
+                            <ClockCircleOutlined style={{ color: '#00d09c' }} />
+                            <span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 14, color: tc }}>Live Market Activity</span>
+                          </Space>
+                        }
+                        style={{ height: '100%', minHeight: 450, background: isDarkMode ? '#121620' : '#ffffff', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', borderRadius: 12 }}
+                        styles={{ body: { padding: '12px 16px' } }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 500, overflowY: 'auto' }}>
+                          {activityFeed.map((act) => (
+                            <div key={act.id} style={{ 
+                              padding: '10px 12px', 
+                              borderRadius: 8, 
+                              background: bgInner, 
+                              borderLeft: `3px solid ${act.color || '#00d09c'}`,
+                              fontSize: 12
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                                <Text style={{ fontWeight: 700, color: tc }}>{act.title}</Text>
+                                <Text type="secondary" style={{ fontSize: 9 }}>{act.time}</Text>
+                              </div>
+                              <Text type="secondary" style={{ fontSize: 11, color: tSec }}>{act.message}</Text>
+                            </div>
+                          ))}
+                        </div>
+                      </Card>
+                    </Col>
                   </Row>
                 </div>
               )
@@ -1534,6 +1697,189 @@ export default function InvestorDashboard() {
                       }
                     ]}
                   />
+                </div>
+              )
+            },
+            {
+              key: '5',
+              label: (
+                <span style={{ fontSize: 15, padding: '4px 8px', fontWeight: 600, color: activeTab === '5' ? '#00d09c' : '#7c8099' }}>
+                  <RiseOutlined /> LEADERBOARD & BADGES
+                </span>
+              ),
+              children: (
+                <div style={{ marginTop: 16 }}>
+                  <Row gutter={[24, 24]}>
+                    <Col xs={24} lg={12}>
+                      <Card title={<span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: tc }}>My Badges</span>} style={{ height: '100%', background: bgCard, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: 16, textAlign: 'center' }}>
+                          {/* Badge 1: Angel Pioneer */}
+                          <div style={{ 
+                            padding: 12, 
+                            borderRadius: 12, 
+                            background: bgInner, 
+                            opacity: totalInvestedMyPortfolio > 0 ? 1 : 0.4,
+                            transition: 'all 0.3s',
+                            boxShadow: totalInvestedMyPortfolio > 0 ? '0 4px 10px rgba(59, 130, 246, 0.25)' : 'none',
+                            border: totalInvestedMyPortfolio > 0 ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent'
+                          }}>
+                            <Avatar size={48} style={{ backgroundColor: totalInvestedMyPortfolio > 0 ? '#3b82f6' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>👼</Avatar>
+                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Angel Pioneer</div>
+                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>First investment pledged</div>
+                          </div>
+
+                          {/* Badge 2: Whale Investor */}
+                          <div style={{ 
+                            padding: 12, 
+                            borderRadius: 12, 
+                            background: bgInner, 
+                            opacity: totalInvestedMyPortfolio >= 50000 ? 1 : 0.4,
+                            transition: 'all 0.3s',
+                            boxShadow: totalInvestedMyPortfolio >= 50000 ? '0 4px 10px rgba(234, 88, 12, 0.25)' : 'none',
+                            border: totalInvestedMyPortfolio >= 50000 ? '1px solid rgba(234, 88, 12, 0.4)' : '1px solid transparent'
+                          }}>
+                            <Avatar size={48} style={{ backgroundColor: totalInvestedMyPortfolio >= 50000 ? '#ea580c' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🐋</Avatar>
+                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Whale Investor</div>
+                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Pledge over ₹50,000</div>
+                          </div>
+
+                          {/* Badge 3: Portfolio Maestro */}
+                          <div style={{ 
+                            padding: 12, 
+                            borderRadius: 12, 
+                            background: bgInner, 
+                            opacity: myInvestments.length >= 3 ? 1 : 0.4,
+                            transition: 'all 0.3s',
+                            boxShadow: myInvestments.length >= 3 ? '0 4px 10px rgba(139, 92, 246, 0.25)' : 'none',
+                            border: myInvestments.length >= 3 ? '1px solid rgba(139, 92, 246, 0.4)' : '1px solid transparent'
+                          }}>
+                            <Avatar size={48} style={{ backgroundColor: myInvestments.length >= 3 ? '#8b5cf6' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🎻</Avatar>
+                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Portfolio Maestro</div>
+                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Invest in 3+ companies</div>
+                          </div>
+
+                          {/* Badge 4: Eco Champion */}
+                          <div style={{ 
+                            padding: 12, 
+                            borderRadius: 12, 
+                            background: bgInner, 
+                            opacity: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
+                            }) ? 1 : 0.4,
+                            transition: 'all 0.3s',
+                            boxShadow: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
+                            }) ? '0 4px 10px rgba(16, 185, 129, 0.25)' : 'none',
+                            border: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
+                            }) ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid transparent'
+                          }}>
+                            <Avatar size={48} style={{ backgroundColor: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('clean') || sObj.category.toLowerCase().includes('water') || sObj.category.toLowerCase().includes('turbine'));
+                            }) ? '#10b981' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🌿</Avatar>
+                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Eco Champion</div>
+                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Support Green/Clean Tech</div>
+                          </div>
+
+                          {/* Badge 5: Tech Pioneer */}
+                          <div style={{ 
+                            padding: 12, 
+                            borderRadius: 12, 
+                            background: bgInner, 
+                            opacity: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
+                            }) ? 1 : 0.4,
+                            transition: 'all 0.3s',
+                            boxShadow: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
+                            }) ? '0 4px 10px rgba(236, 72, 153, 0.25)' : 'none',
+                            border: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
+                            }) ? '1px solid rgba(236, 72, 153, 0.4)' : '1px solid transparent'
+                          }}>
+                            <Avatar size={48} style={{ backgroundColor: myInvestments.some(inv => {
+                              const sObj = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+                              return sObj && (sObj.category.toLowerCase().includes('ai') || sObj.category.toLowerCase().includes('robotics') || sObj.category.toLowerCase().includes('quantum') || sObj.category.toLowerCase().includes('bionic'));
+                            }) ? '#ec4899' : '#cbd5e1', color: '#fff', fontSize: 22, margin: '0 auto' }}>🤖</Avatar>
+                            <div style={{ fontWeight: 700, fontSize: 12, marginTop: 8, color: tc }}>Tech Pioneer</div>
+                            <div style={{ fontSize: 9, color: '#7c8099', marginTop: 4 }}>Support Advanced Tech</div>
+                          </div>
+                        </div>
+                      </Card>
+                    </Col>
+                    
+                    <Col xs={24} lg={12}>
+                      <Card title={<span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 16, color: tc }}>Leaderboard (Top Investors)</span>} style={{ background: bgCard, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
+                        <Table
+                          pagination={false}
+                          dataSource={[
+                            { rank: 1, name: 'Siddharth M.', amount: 245000, deals: 8, ROI: '+42%', avatar: '👨‍💼' },
+                            { rank: 2, name: 'Priya Sharma', amount: 180000, deals: 6, ROI: '+35%', avatar: '👩‍💼' },
+                            { rank: 3, name: 'Kunal Kapoor', amount: 125000, deals: 4, ROI: '+28%', avatar: '👨‍💻' },
+                            { 
+                              rank: totalInvestedMyPortfolio > 125000 ? 3 : (totalInvestedMyPortfolio > 0 ? 4 : '100+'),
+                              name: currentUser?.name || 'You', 
+                              amount: totalInvestedMyPortfolio, 
+                              deals: myInvestments.length, 
+                              ROI: totalInvestedMyPortfolio > 0 ? '+15%' : '0%', 
+                              avatar: '🚀',
+                              isMe: true 
+                            },
+                            { rank: 4, name: 'Ananya Goel', amount: 95000, deals: 5, ROI: '+21%', avatar: '👩‍🎨' },
+                            { rank: 5, name: 'Rohan Verma', amount: 75000, deals: 3, ROI: '+18%', avatar: '👨‍🚀' }
+                          ].sort((a, b) => b.amount - a.amount).map((item, idx) => ({ ...item, rank: idx + 1 }))}
+                          columns={[
+                            { 
+                              title: 'Rank', 
+                              dataIndex: 'rank', 
+                              render: (val, record) => (
+                                <span style={{ 
+                                  fontWeight: 800, 
+                                  color: record.isMe ? '#00d09c' : (val === 1 ? '#eab308' : val === 2 ? '#94a3b8' : val === 3 ? '#b45309' : tc)
+                                }}>
+                                  #{val}
+                                </span>
+                              )
+                            },
+                            { 
+                              title: 'Investor', 
+                              dataIndex: 'name', 
+                              render: (val, record) => (
+                                <Space>
+                                  <span>{record.avatar}</span>
+                                  <span style={{ fontWeight: record.isMe ? 800 : 500, color: record.isMe ? '#00d09c' : tc }}>
+                                    {val} {record.isMe && '(You)'}
+                                  </span>
+                                </Space>
+                              )
+                            },
+                            { 
+                              title: 'Capital Deployed', 
+                              dataIndex: 'amount', 
+                              render: (val) => `₹${val.toLocaleString()}` 
+                            },
+                            { 
+                              title: 'Deals', 
+                              dataIndex: 'deals' 
+                            },
+                            { 
+                              title: 'ROI Growth', 
+                              dataIndex: 'ROI',
+                              render: (val) => <span style={{ color: '#10b981', fontWeight: 700 }}>{val}</span>
+                            }
+                          ]}
+                          rowClassName={(record) => record.isMe ? 'leaderboard-me-row' : ''}
+                        />
+                      </Card>
+                    </Col>
+                  </Row>
                 </div>
               )
             }
@@ -2226,13 +2572,57 @@ export default function InvestorDashboard() {
 
                       <Divider style={{ margin: '16px 0' }} />
 
-                      <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>VALUATION HISTORY</Text>
+                      <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>VALUATION HISTORY &amp; PROJECTION</Text>
                       {s.pastValuations && s.pastValuations.length > 1 ? (
                         <div style={{ background: bgInner, padding: 16, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7' }}>
-                          <ValuationSparkline data={s.pastValuations} />
-                          <div style={{ textAlign: 'center', marginTop: 8 }}>
-                            <Text type="secondary" style={{ fontSize: 11 }}>Valuation Trend Curve (past rounds)</Text>
-                          </div>
+                          {(() => {
+                            const currentVal = s.pastValuations[s.pastValuations.length - 1];
+                            const round1 = Math.round(currentVal * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                            const round2 = Math.round(round1 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                            const round3 = Math.round(round2 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                            const projectedValuations = [...s.pastValuations, round1, round2, round3];
+                            return (
+                              <>
+                                <ValuationSparkline data={projectedValuations} projectionCount={3} />
+                                <div style={{ marginTop: 20, padding: '12px 16px', background: bgCard, borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                                  <Text style={{ fontSize: 12, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
+                                    VALUATION PROJECTION SIMULATOR (SaaS Model)
+                                  </Text>
+                                  <div style={{ marginBottom: 12 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                                      <Text type="secondary">Expected Annual Growth Rate</Text>
+                                      <Text style={{ color: '#00d09c', fontWeight: 600 }}>{projectionGrowth}%</Text>
+                                    </div>
+                                    <Slider 
+                                      min={0} 
+                                      max={100} 
+                                      value={projectionGrowth} 
+                                      onChange={(val) => setProjectionGrowth(val)} 
+                                      trackStyle={{ backgroundColor: '#00d09c' }}
+                                      handleStyle={{ borderColor: '#00d09c' }}
+                                    />
+                                  </div>
+                                  <div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                                      <Text type="secondary">Customer Retention Rate (Net Revenue Retention)</Text>
+                                      <Text style={{ color: '#ea580c', fontWeight: 600 }}>{projectionRetention}%</Text>
+                                    </div>
+                                    <Slider 
+                                      min={50} 
+                                      max={100} 
+                                      value={projectionRetention} 
+                                      onChange={(val) => setProjectionRetention(val)} 
+                                      trackStyle={{ backgroundColor: '#ea580c' }}
+                                      handleStyle={{ borderColor: '#ea580c' }}
+                                    />
+                                  </div>
+                                  <div style={{ marginTop: 8, fontSize: 10, color: '#7c8099', fontStyle: 'italic' }}>
+                                    *Estimations are computed using compounded net expansion metrics.
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
                         </div>
                       ) : (
                         <Text type="secondary">No valuation history data available.</Text>

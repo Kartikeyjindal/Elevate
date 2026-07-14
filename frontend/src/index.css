@@ -235,5 +235,31 @@ body.dark [style*="border:1px solid #edf2f7"] {
   border: 1px solid #1f2937 !important;
 }
 
+/* Leaderboard User Highlight */
+.leaderboard-me-row {
+  background-color: rgba(0, 208, 156, 0.08) !important;
+}
+
+body.dark .leaderboard-me-row {
+  background-color: rgba(0, 208, 156, 0.15) !important;
+}
+
+.leaderboard-me-row td {
+  font-weight: 700 !important;
+}
+
+/* Slide in animation for live activity feed */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 
 
