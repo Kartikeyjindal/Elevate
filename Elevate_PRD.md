@@ -22,7 +22,6 @@ Admins responsible for reviewing and approving pending startup applications, pub
 
 ### 3.1 User Authentication
 * **Credentials Login:** Log in using email/username and password.
-* **OTP Login:** Request a 6-digit OTP code sent to user email and verify to log in.
 * **Registration:** Only `@gmail.com` addresses are allowed.
 
 ### 3.2 Investor Dashboard
