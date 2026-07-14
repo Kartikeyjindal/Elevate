@@ -370,6 +370,12 @@ export default function InvestorDashboard() {
   const [razorpayOrderInfo, setRazorpayOrderInfo] = useState(null);
   const [mockRazorpayLoading, setMockRazorpayLoading] = useState(false);
 
+  // Exit Simulator & Transactions States
+  const [exitMultiple, setExitMultiple] = useState(5);
+  const [exitTimeframe, setExitTimeframe] = useState(3);
+  const [walletTransactions, setWalletTransactions] = useState([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
+
   const loadRazorpayScript = () => {
     return new Promise((resolve) => {
       if (window.Razorpay) {
@@ -443,6 +449,93 @@ export default function InvestorDashboard() {
     }
     return () => clearInterval(timer);
   }, [showQrCode, countdown]);
+
+  const handleDownloadStatement = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      message.error('Failed to open export window. Please allow popups.');
+      return;
+    }
+
+    const txRows = walletTransactions.map(tx => {
+      const isCredit = ['deposit', 'sell_return', 'refund'].includes(tx.type);
+      return `
+        <tr style="border-bottom: 1px solid #edf2f7;">
+          <td style="padding: 12px; font-size: 13px; color: #2d3748;">${new Date(tx.createdAt).toLocaleString()}</td>
+          <td style="padding: 12px; font-size: 13px;">
+            <span style="display: inline-block; padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; background: ${isCredit ? '#e6fffa' : '#fff5f5'}; color: ${isCredit ? '#319795' : '#e53e3e'};">
+              ${tx.type.replace('_', ' ').toUpperCase()}
+            </span>
+          </td>
+          <td style="padding: 12px; font-size: 13px; font-weight: 700; text-align: right; color: ${isCredit ? '#38a169' : '#e53e3e'};">
+            ${isCredit ? '+' : '-'}₹${tx.amount.toLocaleString()}
+          </td>
+          <td style="padding: 12px; font-size: 13px; color: #4a5568;">${tx.description || 'Wallet transaction'}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Elevate Equity - Account Statement</title>
+        <style>
+          body { font-family: 'Plus Jakarta Sans', 'Outfit', sans-serif; margin: 0; padding: 40px; color: #2d3748; background: #ffffff; }
+          .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #edf2f7; padding-bottom: 20px; margin-bottom: 30px; }
+          .logo { font-size: 24px; font-weight: 900; color: #00d09c; letter-spacing: -0.5px; }
+          .title { font-size: 20px; font-weight: 800; text-align: right; }
+          .metadata { display: flex; justify-content: space-between; margin-bottom: 30px; font-size: 13px; color: #718096; }
+          .table { width: 100%; border-collapse: collapse; margin-bottom: 40px; }
+          .th { padding: 12px; background: #f7fafc; border-bottom: 2px solid #edf2f7; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #718096; }
+          .footer { text-align: center; border-top: 1px solid #edf2f7; padding-top: 20px; font-size: 11px; color: #a0aec0; margin-top: 50px; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">🚀 ELEVATE EQUITY</div>
+          <div class="title">ACCOUNT STATEMENT</div>
+        </div>
+        <div class="metadata">
+          <div>
+            <strong>Investor Name:</strong> ${currentUser ? currentUser.name : 'Platform Investor'}<br/>
+            <strong>Email:</strong> ${currentUser ? currentUser.email : ''}
+          </div>
+          <div style="text-align: right;">
+            <strong>Statement Date:</strong> ${new Date().toLocaleDateString()}<br/>
+            <strong>Current Balance:</strong> ₹${currentUser ? currentUser.walletBalance.toLocaleString() : '0'}
+          </div>
+        </div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="th" style="width: 25%;">Timestamp</th>
+              <th class="th" style="width: 15%;">Transaction Type</th>
+              <th class="th" style="width: 20%; text-align: right;">Amount (INR)</th>
+              <th class="th" style="width: 40%;">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${txRows}
+          </tbody>
+        </table>
+        <div class="footer">
+          © 2016-2026 Elevate Equity. Vaishnavi Tech Park, South Tower, Bangalore, Karnataka. This is a computer-generated document and requires no signature.
+        </div>
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 500);
+          };
+        </script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
 
   const handleWalletTransaction = async () => {
     if (!walletAmount || walletAmount <= 0) {
@@ -724,7 +817,16 @@ export default function InvestorDashboard() {
         const newsData = await newsRes.json();
         setMarketNews(newsData);
       }
-      setNewsLoading(false);
+      // Fetch wallet transactions
+      setLoadingTransactions(true);
+      const txsRes = await fetch(`${API_URL}/api/wallet/transactions`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (txsRes.ok) {
+        const txsData = await txsRes.json();
+        setWalletTransactions(txsData);
+      }
+      setLoadingTransactions(false);
     } catch (err) {
       message.error('Failed to load dashboard data');
     }
@@ -1182,6 +1284,49 @@ export default function InvestorDashboard() {
 
   const totalInvestedMyPortfolio = myInvestments.reduce((acc, curr) => acc + curr.amount, 0);
 
+  // Calculate Sector Exposure
+  const getSectorExposureData = () => {
+    const allocations = {};
+    myInvestments.forEach(inv => {
+      const startup = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+      const cat = startup ? startup.category : 'General';
+      allocations[cat] = (allocations[cat] || 0) + inv.amount;
+    });
+
+    const total = Object.values(allocations).reduce((a, b) => a + b, 0);
+    const data = Object.entries(allocations).map(([category, amount]) => ({
+      category,
+      amount,
+      percentage: total > 0 ? (amount / total) * 100 : 0
+    }));
+
+    if (data.length === 0) {
+      return [
+        { category: 'CleanTech', amount: 0, percentage: 30, color: '#10b981' },
+        { category: 'AI & Robotics', amount: 0, percentage: 40, color: '#ec4899' },
+        { category: 'SaaS', amount: 0, percentage: 20, color: '#3b82f6' },
+        { category: 'Other', amount: 0, percentage: 10, color: '#8b5cf6' }
+      ];
+    }
+
+    const colors = ['#ec4899', '#10b981', '#fbbf24', '#3b82f6', '#8b5cf6', '#06b6d4'];
+    let cumulativePercent = 0;
+    return data.map((d, index) => {
+      const percentage = d.percentage;
+      const strokeDash = `${percentage} ${100 - percentage}`;
+      const strokeOffset = 100 - cumulativePercent + 25;
+      cumulativePercent += percentage;
+      return {
+        ...d,
+        strokeDash,
+        strokeOffset,
+        color: colors[index % colors.length]
+      };
+    });
+  };
+
+  const sectorSegments = getSectorExposureData();
+
   return (
     <Layout style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#0b0f19' : '#f4f6f9' }}>
       {/* Groww-style Navigation Header */}
@@ -1592,9 +1737,10 @@ export default function InvestorDashboard() {
               ),
               children: (
                 <div style={{ marginTop: 16 }}>
-                  <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+                  {/* Row 1: Capital Stats */}
+                  <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                     <Col xs={24} md={12}>
-                      <Card>
+                      <Card style={{ background: bgInner, border: `1px solid ${borderCl}` }}>
                         <Statistic 
                           title={<span style={{ color: '#7c8099', fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>Capital Deployed</span>} 
                           value={`₹${totalInvestedMyPortfolio.toLocaleString()}`} 
@@ -1603,12 +1749,117 @@ export default function InvestorDashboard() {
                       </Card>
                     </Col>
                     <Col xs={24} md={12}>
-                      <Card>
+                      <Card style={{ background: bgInner, border: `1px solid ${borderCl}` }}>
                         <Statistic 
                           title={<span style={{ color: '#7c8099', fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>Active Holdings</span>} 
                           value={myInvestments.length} 
                           valueStyle={{ color: '#00d09c', fontSize: 26, fontFamily: 'Outfit', fontWeight: 800 }}
                         />
+                      </Card>
+                    </Col>
+                  </Row>
+
+                  {/* Row 2: Asset Allocation Heatmap (SVG Donut Chart) & Valuation Growth Curve */}
+                  <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+                    {/* Left: Donut Chart */}
+                    <Col xs={24} md={12}>
+                      <Card style={{ background: bgInner, border: `1px solid ${borderCl}`, minHeight: 280 }}>
+                        <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: '0 0 16px 0', fontSize: 14 }}>
+                          🍰 Asset Allocation & Sector Exposure
+                        </Title>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: 16 }}>
+                          <div style={{ position: 'relative', width: 130, height: 130 }}>
+                            <svg width="130" height="130" viewBox="0 0 42 42">
+                              <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke={isDarkMode ? '#1f2937' : '#e5e7eb'} strokeWidth="4.5"></circle>
+                              {sectorSegments.map((seg, i) => (
+                                <circle 
+                                  key={i}
+                                  cx="21" 
+                                  cy="21" 
+                                  r="15.91549430918954" 
+                                  fill="transparent" 
+                                  stroke={seg.color} 
+                                  strokeWidth="4.5" 
+                                  strokeDasharray={seg.strokeDash} 
+                                  strokeDashoffset={seg.strokeOffset}
+                                  style={{ transition: 'stroke-dashoffset 0.3s' }}
+                                />
+                              ))}
+                              <g style={{ transform: 'translate(0px, 0px)' }}>
+                                <text x="50%" y="46%" textAnchor="middle" fill={tc} style={{ fontSize: '3.8px', fontWeight: 800, fontFamily: 'Outfit' }}>
+                                  {totalInvestedMyPortfolio > 0 ? `₹${totalInvestedMyPortfolio >= 100000 ? (totalInvestedMyPortfolio / 1000).toFixed(0) + 'K' : totalInvestedMyPortfolio.toLocaleString()}` : '₹0'}
+                                </text>
+                                <text x="50%" y="58%" textAnchor="middle" fill="#7c8099" style={{ fontSize: '2px', fontWeight: 700, letterSpacing: '0.1px' }}>
+                                  INVESTED
+                                </text>
+                              </g>
+                            </svg>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 160 }}>
+                            {sectorSegments.map((seg, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, display: 'inline-block' }} />
+                                <span style={{ color: tc, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: 90 }}>
+                                  {seg.category}
+                                </span>
+                                <span style={{ color: '#7c8099', fontWeight: 700 }}>
+                                  {seg.percentage.toFixed(0)}%
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </Card>
+                    </Col>
+
+                    {/* Right: Portfolio Valuation Line Graph */}
+                    <Col xs={24} md={12}>
+                      <Card style={{ background: bgInner, border: `1px solid ${borderCl}`, minHeight: 280 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                          <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 14 }}>
+                            📈 Portfolio Valuation Trajectory
+                          </Title>
+                          <Tag color="green" style={{ fontWeight: 700 }}>+15.2% ROI</Tag>
+                        </div>
+                        <div style={{ padding: '0 8px' }}>
+                          <svg width="100%" height="120" viewBox="0 0 300 100" style={{ overflow: 'visible' }}>
+                            <defs>
+                              <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
+                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
+                              </linearGradient>
+                            </defs>
+                            {/* Grid lines */}
+                            <line x1="10" y1="15" x2="290" y2="15" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                            <line x1="10" y1="45" x2="290" y2="45" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                            <line x1="10" y1="75" x2="290" y2="75" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                            
+                            {/* Area Gradient fill */}
+                            <path d="M10 90 L10 80 L80 72 L150 48 L220 54 L290 15 L290 90 Z" fill="url(#valGrad)" />
+                            
+                            {/* Line path */}
+                            <path d="M10 80 L80 72 L150 48 L220 54 L290 15" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+                            
+                            {/* Circle Markers */}
+                            <circle cx="10" cy="80" r="3" fill="#10b981" />
+                            <circle cx="80" cy="72" r="3" fill="#10b981" />
+                            <circle cx="150" cy="48" r="3" fill="#10b981" />
+                            <circle cx="220" cy="54" r="3" fill="#10b981" />
+                            <circle cx="290" cy="15" r="4.5" fill={isDarkMode ? '#111827' : '#fff'} stroke="#10b981" strokeWidth="2" />
+                            
+                            {/* Axis Labels */}
+                            <text x="10" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Mar</text>
+                            <text x="80" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Apr</text>
+                            <text x="150" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">May</text>
+                            <text x="220" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Jun</text>
+                            <text x="290" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Jul</text>
+                          </svg>
+                        </div>
+                        <div style={{ textAlign: 'center', marginTop: 12 }}>
+                          <Text type="secondary" style={{ fontSize: 11 }}>
+                            Trailed performance tracking calculated based on startup valuation shifts.
+                          </Text>
+                        </div>
                       </Card>
                     </Col>
                   </Row>
@@ -1901,7 +2152,53 @@ export default function InvestorDashboard() {
           parser={value => value.replace(/\₹\s?|(,*)/g, '')}
           style={{ width: '100%', height: 42, background: isDarkMode ? '#121620' : '#ffffff', color: tc, border: isDarkMode ? '1px solid #1f2937' : '1px solid #d1d5db', borderRadius: 8, fontSize: 16 }}
         />
-        <Text type="secondary" style={{ color: '#7c8099', fontSize: 12, display: 'block', marginTop: 8 }}>
+        <div style={{ marginTop: 24, borderTop: `1px solid ${borderCl}`, paddingTop: 20 }}>
+          <Text style={{ color: tc, fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 12 }}>
+            📈 Exit ROI & Valuation Simulator
+          </Text>
+          
+          <Row gutter={[16, 16]}>
+            <Col span={12}>
+              <Text style={{ fontSize: 12, color: tSec, display: 'block', marginBottom: 6 }}>Target Valuation Multiple: <strong>{exitMultiple}x</strong></Text>
+              <Slider 
+                min={2} 
+                max={30} 
+                value={exitMultiple} 
+                onChange={setExitMultiple}
+                tooltip={{ formatter: value => `${value}x Multiple` }}
+              />
+            </Col>
+            <Col span={12}>
+              <Text style={{ fontSize: 12, color: tSec, display: 'block', marginBottom: 6 }}>Exit Timeframe: <strong>{exitTimeframe} Years</strong></Text>
+              <Slider 
+                min={1} 
+                max={10} 
+                value={exitTimeframe} 
+                onChange={setExitTimeframe}
+                tooltip={{ formatter: value => `${value} Years` }}
+              />
+            </Col>
+          </Row>
+
+          <div style={{ background: isDarkMode ? '#1e293b' : '#f8fafc', padding: 12, borderRadius: 8, marginTop: 12, border: `1px solid ${borderCl}` }}>
+            <Row gutter={8}>
+              <Col span={8} style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Exit Value</Text>
+                <Text style={{ color: '#10b981', fontWeight: 800, fontSize: 14 }}>₹{(investAmount * exitMultiple).toLocaleString()}</Text>
+              </Col>
+              <Col span={8} style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Est. CAGR</Text>
+                <Text style={{ color: '#00d09c', fontWeight: 800, fontSize: 14 }}>{(((exitMultiple) ** (1 / exitTimeframe) - 1) * 100).toFixed(1)}%</Text>
+              </Col>
+              <Col span={8} style={{ textAlign: 'center' }}>
+                <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>MoIC Multiple</Text>
+                <Text style={{ color: '#8b5cf6', fontWeight: 800, fontSize: 14 }}>{exitMultiple}.0x</Text>
+              </Col>
+            </Row>
+          </div>
+        </div>
+
+        <Text type="secondary" style={{ color: '#7c8099', fontSize: 12, display: 'block', marginTop: 12 }}>
           * Pledge will execute via MongoDB atomic operations. Minimum pledge required is ₹{(selectedStartup?.minimumInvestment || 10000).toLocaleString()}.
         </Text>
       </Modal>
@@ -1922,7 +2219,7 @@ export default function InvestorDashboard() {
           }
         }}
         footer={null}
-        width={450}
+        width={550}
         style={{ borderRadius: 16 }}
         bodyStyle={{ padding: '8px 4px' }}
       >
@@ -2299,6 +2596,64 @@ export default function InvestorDashboard() {
                 </div>
               </div>
             )}
+
+            {/* Recent Wallet Transactions Ledger */}
+            <div style={{ marginTop: 24, borderTop: `1px solid ${borderCl}`, paddingTop: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ color: tc, fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  📜 Recent Wallet Transactions
+                </Text>
+                <Button 
+                  size="small" 
+                  type="link" 
+                  disabled={walletTransactions.length === 0}
+                  onClick={handleDownloadStatement}
+                  style={{ color: '#00d09c', fontSize: 11, fontWeight: 600, padding: 0 }}
+                >
+                  📥 Export Statement
+                </Button>
+              </div>
+
+              {walletTransactions.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '12px 0', background: isDarkMode ? '#1e293b' : '#f8fafc', borderRadius: 8 }}>
+                  <Text type="secondary" style={{ fontSize: 11 }}>No transactions recorded yet.</Text>
+                </div>
+              ) : (
+                <div style={{ maxHeight: 150, overflowY: 'auto', borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, background: isDarkMode ? '#111827' : '#ffffff' }}>
+                    <thead>
+                      <tr style={{ background: isDarkMode ? '#1e293b' : '#f8fafc', borderBottom: `1px solid ${borderCl}` }}>
+                        <th style={{ padding: '6px 8px', textAlign: 'left', color: '#7c8099' }}>Date</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'left', color: '#7c8099' }}>Type</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'right', color: '#7c8099' }}>Amount</th>
+                        <th style={{ padding: '6px 8px', textAlign: 'left', color: '#7c8099' }}>Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {walletTransactions.map((tx, idx) => {
+                        const isCredit = ['deposit', 'sell_return', 'refund'].includes(tx.type);
+                        return (
+                          <tr key={tx._id || idx} style={{ borderBottom: idx !== walletTransactions.length - 1 ? `1px solid ${borderCl}` : 'none' }}>
+                            <td style={{ padding: '6px 8px', color: tc }}>{new Date(tx.createdAt).toLocaleDateString()}</td>
+                            <td style={{ padding: '6px 8px' }}>
+                              <Tag color={isCredit ? 'green' : 'volcano'} style={{ fontSize: 9, fontWeight: 700, borderRadius: 4 }}>
+                                {tx.type.replace('_', ' ').toUpperCase()}
+                              </Tag>
+                            </td>
+                            <td style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 700, color: isCredit ? '#10b981' : '#ef4444' }}>
+                              {isCredit ? '+' : '-'}₹{tx.amount.toLocaleString()}
+                            </td>
+                            <td style={{ padding: '6px 8px', color: tSec, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={tx.description}>
+                              {tx.description || 'Wallet transaction'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

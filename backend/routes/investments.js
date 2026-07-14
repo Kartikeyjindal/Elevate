@@ -102,6 +102,18 @@ router.post('/invest', verifyToken, async (req, res) => {
       user.portfolio.push(savedInvestment._id);
       await user.save({ session });
 
+      // Log wallet transaction
+      const WalletTransaction = require('../models/walletTransaction');
+      const tx = new WalletTransaction({
+        userId,
+        type: 'investment',
+        amount: investAmount,
+        status: 'completed',
+        referenceId: savedInvestment._id.toString(),
+        description: `Pledged capital to startup`
+      });
+      await tx.save({ session });
+
       // 6. Add raisedAmount to startup
       startup.raisedAmount += investAmount;
       await startup.save({ session });
@@ -146,6 +158,18 @@ router.post('/invest', verifyToken, async (req, res) => {
 
       user.portfolio.push(savedInvestment._id);
       await user.save();
+
+      // Log wallet transaction
+      const WalletTransaction = require('../models/walletTransaction');
+      const tx = new WalletTransaction({
+        userId,
+        type: 'investment',
+        amount: investAmount,
+        status: 'completed',
+        referenceId: savedInvestment._id.toString(),
+        description: `Pledged capital to startup`
+      });
+      await tx.save();
 
       startup.raisedAmount += investAmount;
       await startup.save();
@@ -213,6 +237,18 @@ router.post('/sell', verifyToken, async (req, res) => {
       user.portfolio = user.portfolio.filter(id => id.toString() !== investmentId);
       await user.save({ session });
 
+      // Log wallet transaction
+      const WalletTransaction = require('../models/walletTransaction');
+      const tx = new WalletTransaction({
+        userId,
+        type: 'sell_return',
+        amount: investment.amount,
+        status: 'completed',
+        referenceId: investmentId,
+        description: `Sold shares (refunded to wallet)`
+      });
+      await tx.save({ session });
+
       const startup = await Startup.findById(investment.startupId).session(session);
       if (startup) {
         startup.raisedAmount = Math.max(0, startup.raisedAmount - investment.amount);
@@ -242,6 +278,18 @@ router.post('/sell', verifyToken, async (req, res) => {
       user.walletBalance += investment.amount;
       user.portfolio = user.portfolio.filter(id => id.toString() !== investmentId);
       await user.save();
+
+      // Log wallet transaction
+      const WalletTransaction = require('../models/walletTransaction');
+      const tx = new WalletTransaction({
+        userId,
+        type: 'sell_return',
+        amount: investment.amount,
+        status: 'completed',
+        referenceId: investmentId,
+        description: `Sold shares (refunded to wallet)`
+      });
+      await tx.save();
 
       const startup = await Startup.findById(investment.startupId);
       if (startup) {
@@ -282,6 +330,17 @@ router.post('/wallet/deposit', verifyToken, async (req, res) => {
 
     user.walletBalance = (user.walletBalance || 0) + Number(amount);
     await user.save();
+
+    // Log wallet transaction
+    const WalletTransaction = require('../models/walletTransaction');
+    const tx = new WalletTransaction({
+      userId,
+      type: 'deposit',
+      amount: Number(amount),
+      status: 'completed',
+      description: `Deposited funds directly to wallet`
+    });
+    await tx.save();
 
     return res.status(200).json({
       message: 'Deposit successful',
@@ -375,6 +434,18 @@ router.post('/wallet/deposit/verify', verifyToken, async (req, res) => {
     user.walletBalance = (user.walletBalance || 0) + creditAmount;
     await user.save();
 
+    // Log wallet transaction
+    const WalletTransaction = require('../models/walletTransaction');
+    const tx = new WalletTransaction({
+      userId,
+      type: 'deposit',
+      amount: creditAmount,
+      status: 'completed',
+      referenceId: razorpay_payment_id,
+      description: `Deposited funds via Razorpay (Order: ${razorpay_order_id})`
+    });
+    await tx.save();
+
     console.log(`Successfully credited user ${user.email} with ₹${creditAmount} via Razorpay (Mock: ${isMockOrder})`);
 
     return res.status(200).json({
@@ -409,12 +480,36 @@ router.post('/wallet/withdraw', verifyToken, async (req, res) => {
     user.walletBalance = (user.walletBalance || 0) - Number(amount);
     await user.save();
 
+    // Log wallet transaction
+    const WalletTransaction = require('../models/walletTransaction');
+    const tx = new WalletTransaction({
+      userId,
+      type: 'withdrawal',
+      amount: Number(amount),
+      status: 'completed',
+      description: `Withdrew funds from wallet`
+    });
+    await tx.save();
+
     return res.status(200).json({
       message: 'Withdrawal successful',
       updatedWalletBalance: user.walletBalance
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Fetch wallet transactions history
+router.get('/wallet/transactions', verifyToken, async (req, res) => {
+  try {
+    const WalletTransaction = require('../models/walletTransaction');
+    const txs = await WalletTransaction.find({ userId: req.user.id });
+    // Sort transactions by date descending
+    txs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    res.json(txs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
