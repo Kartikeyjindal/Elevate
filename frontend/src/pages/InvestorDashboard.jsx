@@ -280,9 +280,19 @@ export default function InvestorDashboard() {
         ...prev.slice(0, 7)
       ]);
     }, 15000);
-    
     return () => clearInterval(interval);
   }, [startups]);
+
+  const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
+
+  // Hook for rotating the active ticker activity every 6 seconds
+  useEffect(() => {
+    if (activityFeed.length === 0) return;
+    const interval = setInterval(() => {
+      setCurrentActivityIndex(prev => (prev + 1) % activityFeed.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [activityFeed]);
 
   // Theme Toggler state
   const [isDarkMode, setIsDarkMode] = useState(
@@ -1271,6 +1281,68 @@ export default function InvestorDashboard() {
       </Header>
 
       <Content className="fade-in-section" style={{ padding: '32px 24px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
+        {/* Horizontal Ticker Banner at the top */}
+        {activityFeed.length > 0 && (
+          <div style={{
+            background: isDarkMode ? '#111827' : '#ffffff',
+            border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7',
+            borderRadius: '12px',
+            padding: '10px 16px',
+            marginBottom: '24px',
+            overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            height: '42px',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+            position: 'relative'
+          }}>
+            <div style={{ 
+              fontWeight: 700, 
+              color: '#00d09c', 
+              marginRight: '16px', 
+              fontSize: '13px',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              borderRight: `1px solid ${isDarkMode ? '#1f2937' : '#edf2f7'}`,
+              paddingRight: '16px',
+              zIndex: 2,
+              background: isDarkMode ? '#111827' : '#ffffff'
+            }}>
+              <ClockCircleOutlined /> LIVE ACTIVITY
+            </div>
+            <div style={{ overflow: 'hidden', width: '100%', position: 'relative', height: '100%', display: 'flex', alignItems: 'center' }}>
+              {activityFeed.map((act, idx) => {
+                if (idx !== currentActivityIndex) return null;
+                return (
+                  <div 
+                    key={act.id} 
+                    className="ticker-message"
+                    style={{
+                      fontSize: '13px',
+                      color: tc,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      animation: 'slideLeftToRight 6s linear forwards',
+                      whiteSpace: 'nowrap',
+                      position: 'absolute',
+                      left: 0
+                    }}
+                  >
+                    <Tag color={act.color || 'green'} style={{ margin: 0, fontSize: '10px', fontWeight: 700 }}>
+                      {act.title.toUpperCase()}
+                    </Tag>
+                    <span style={{ fontWeight: 600 }}>{act.message}</span>
+                    <span style={{ fontSize: '11px', color: tSec }}>({act.time})</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         <Tabs 
           activeKey={activeTab} 
           onChange={setActiveTab}
@@ -1315,234 +1387,198 @@ export default function InvestorDashboard() {
                     </Col>
                   </Row>
 
-                  {/* Two Column Layout: Marketplace Grid & Live Ticker */}
-                  <Row gutter={[24, 24]}>
-                    <Col xs={24} lg={18}>
-                      <Row gutter={[20, 20]}>
-                        {filteredStartups.length === 0 ? (
-                          <Col span={24}>
-                            <Card style={{ textAlign: 'center', padding: 48 }}>
-                              <Text style={{ color: '#7c8099', fontSize: 15 }}>No matching startups found. Try another query.</Text>
-                            </Card>
-                          </Col>
-                        ) : (
-                          filteredStartups.map(startup => {
-                            const targetFunding = startup.targetGoal || 10000000;
-                            const raisedProgress = Math.min(100, Math.round(((startup.raisedAmount || 0) / targetFunding) * 100));
-                            
-                            return (
-                              <Col xs={24} md={12} key={startup._id}>
-                                <Card 
-                                  cover={
-                                    <div style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
-                                      <img 
-                                        alt={startup.name} 
-                                        src={startup.logoUrl || "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80"} 
-                                        style={{ 
-                                          width: '100%', 
-                                          height: '100%', 
-                                          objectFit: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? 'contain' : 'cover',
-                                          background: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) 
-                                            ? (startup.logoUrl.includes('Raised_Type') ? '#0f172a' : (isDarkMode ? '#1e293b' : '#f8fafc')) 
-                                            : 'transparent',
-                                          padding: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? '12px' : '0px'
-                                        }}
-                                      />
-                                      <div style={{
-                                        position: 'absolute',
-                                        top: 12,
-                                        left: 12,
-                                        background: 'rgba(0, 0, 0, 0.65)',
-                                        backdropFilter: 'blur(4px)',
-                                        padding: '4px 10px',
-                                        borderRadius: '4px',
-                                        color: '#fff',
-                                        fontWeight: 600,
-                                        fontSize: 11
-                                      }}>
-                                        {startup.category}
-                                      </div>
-                                      {startup.daysLeft === 0 && (
-                                        <div style={{
-                                          position: 'absolute',
-                                          top: 12,
-                                          right: 12,
-                                          background: '#10b981',
-                                          padding: '4px 10px',
-                                          borderRadius: '4px',
-                                          color: '#fff',
-                                          fontWeight: 700,
-                                          fontSize: 11,
-                                          textTransform: 'uppercase'
-                                        }}>
-                                          Funded
-                                        </div>
-                                      )}
+                  {/* Startup Marketplace Grid */}
+                  <Row gutter={[20, 20]}>
+                    {filteredStartups.length === 0 ? (
+                      <Col span={24}>
+                        <Card style={{ textAlign: 'center', padding: 48 }}>
+                          <Text style={{ color: '#7c8099', fontSize: 15 }}>No matching startups found. Try another query.</Text>
+                        </Card>
+                      </Col>
+                    ) : (
+                      filteredStartups.map(startup => {
+                        const targetFunding = startup.targetGoal || 10000000;
+                        const raisedProgress = Math.min(100, Math.round(((startup.raisedAmount || 0) / targetFunding) * 100));
+                        
+                        return (
+                          <Col xs={24} md={12} lg={8} key={startup._id}>
+                            <Card 
+                              cover={
+                                <div style={{ position: 'relative', height: 160, overflow: 'hidden' }}>
+                                  <img 
+                                    alt={startup.name} 
+                                    src={startup.logoUrl || "https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=400&q=80"} 
+                                    style={{ 
+                                      width: '100%', 
+                                      height: '100%', 
+                                      objectFit: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? 'contain' : 'cover',
+                                      background: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) 
+                                        ? (startup.logoUrl.includes('Raised_Type') ? '#0f172a' : (isDarkMode ? '#1e293b' : '#f8fafc')) 
+                                        : 'transparent',
+                                      padding: startup.logoUrl && (startup.logoUrl.includes('Logo') || startup.logoUrl.includes('logo') || startup.logoUrl.includes('Raised_Type')) ? '12px' : '0px'
+                                    }}
+                                  />
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: 12,
+                                    left: 12,
+                                    background: 'rgba(0, 0, 0, 0.65)',
+                                    backdropFilter: 'blur(4px)',
+                                    padding: '4px 10px',
+                                    borderRadius: '4px',
+                                    color: '#fff',
+                                    fontWeight: 600,
+                                    fontSize: 11
+                                  }}>
+                                    {startup.category}
+                                  </div>
+                                  {startup.daysLeft === 0 && (
+                                    <div style={{
+                                      position: 'absolute',
+                                      top: 12,
+                                      right: 12,
+                                      background: '#10b981',
+                                      padding: '4px 10px',
+                                      borderRadius: '4px',
+                                      color: '#fff',
+                                      fontWeight: 700,
+                                      fontSize: 11,
+                                      textTransform: 'uppercase'
+                                    }}>
+                                      Funded
                                     </div>
-                                  }
-                                  style={{ overflow: 'hidden', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', background: isDarkMode ? '#111827' : '#ffffff', height: '100%' }}
-                                  bodyStyle={{ padding: 20 }}
-                                >
-                                  <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
-                                    <div>
-                                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
-                                        <Title 
-                                          level={4} 
-                                          style={{ 
-                                            color: isDarkMode ? '#f1f5f9' : '#1e293b', 
-                                            margin: 0, 
-                                            fontFamily: 'Outfit', 
-                                            fontWeight: 800, 
-                                            fontSize: 18,
-                                            cursor: 'pointer'
-                                          }}
-                                          onClick={() => handleOpenCompanyDetails(startup)}
-                                        >
-                                          {startup.name}
-                                        </Title>
-                                      </div>
-                                      
-                                      <Paragraph ellipsis={{ rows: 2 }} style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 13, minHeight: 40, marginBottom: 16 }}>
-                                        {startup.tagline}
-                                      </Paragraph>
+                                  )}
+                                </div>
+                              }
+                              style={{ overflow: 'hidden', borderRadius: 12, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', background: isDarkMode ? '#111827' : '#ffffff', height: '100%' }}
+                              bodyStyle={{ padding: 20 }}
+                            >
+                              <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
+                                <div>
+                                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+                                    <Title 
+                                      level={4} 
+                                      style={{ 
+                                        color: isDarkMode ? '#f1f5f9' : '#1e293b', 
+                                        margin: 0, 
+                                        fontFamily: 'Outfit', 
+                                        fontWeight: 800, 
+                                        fontSize: 18,
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => handleOpenCompanyDetails(startup)}
+                                    >
+                                      {startup.name}
+                                    </Title>
+                                  </div>
+                                  
+                                  <Paragraph ellipsis={{ rows: 2 }} style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 13, minHeight: 40, marginBottom: 16 }}>
+                                    {startup.tagline}
+                                  </Paragraph>
+                                </div>
+
+                                <div>
+                                  {/* Progress bar */}
+                                  <div style={{ marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                                      <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
+                                        ₹{(startup.raisedAmount || 0).toLocaleString()}
+                                      </Text>
+                                      <Text style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 12, fontWeight: 600 }}>
+                                        {raisedProgress}% of target
+                                      </Text>
                                     </div>
-
-                                    <div>
-                                      {/* Progress bar */}
-                                      <div style={{ marginBottom: 16 }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                                          <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
-                                            ₹{(startup.raisedAmount || 0).toLocaleString()}
-                                          </Text>
-                                          <Text style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 12, fontWeight: 600 }}>
-                                            {raisedProgress}% of target
-                                          </Text>
-                                        </div>
-                                        <Progress 
-                                          percent={raisedProgress} 
-                                          showInfo={false} 
-                                          strokeColor="#00d09c"
-                                          trailColor={isDarkMode ? '#374151' : '#f1f5f9'}
-                                          strokeWidth={6}
-                                        />
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-                                          <Text type="secondary" style={{ fontSize: 11 }}>{startup.totalInvestors?.toLocaleString() || 0} investors</Text>
-                                          <Text type="secondary" style={{ fontSize: 11 }}>Target: ₹{targetFunding.toLocaleString()}</Text>
-                                        </div>
-                                      </div>
-
-                                      {/* Financial metrics grid */}
-                                      <Row gutter={[8, 8]} style={{ 
-                                        background: bgInner, 
-                                        padding: '12px', 
-                                        borderRadius: 8,
-                                        border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7',
-                                        marginBottom: 16
-                                      }}>
-                                        <Col span={12}>
-                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Min. Investment</Text>
-                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>₹{(startup.minimumInvestment || 0).toLocaleString()}</Text>
-                                        </Col>
-                                        <Col span={12}>
-                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Valuation Cap</Text>
-                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
-                                            ₹{(startup.valuationCap || startup.pastValuations?.[startup.pastValuations.length - 1] || 0).toLocaleString()}
-                                          </Text>
-                                        </Col>
-                                        <Col span={12} style={{ marginTop: 8 }}>
-                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Security Type</Text>
-                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 12, fontWeight: 600 }}>{startup.securityType || 'Crowd SAFE'}</Text>
-                                        </Col>
-                                        <Col span={12} style={{ marginTop: 8 }}>
-                                          <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Days Left</Text>
-                                          <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
-                                            {startup.daysLeft > 0 ? `${startup.daysLeft} days` : 'Closed'}
-                                          </Text>
-                                        </Col>
-                                      </Row>
-
-                                      {/* Venture Details (Expandable) */}
-                                      {expandedStartupId === startup._id && (
-                                        <div className="fade-in-section" style={{ borderTop: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', paddingTop: 16, marginBottom: 16 }}>
-                                          <div style={{ marginBottom: 12 }}>
-                                            <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>MARKETING STRATEGY (4 Ps)</Text>
-                                            <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.marketingMixVariables}</Paragraph>
-                                          </div>
-                                          <div>
-                                            <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>BUDGETING & SUPPLY CHAIN</Text>
-                                            <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.financialProcurement}</Paragraph>
-                                          </div>
-                                        </div>
-                                      )}
-
-                                      <Space style={{ width: '100%', justifyContent: 'space-between' }}>
-                                        <Button 
-                                          type="text" 
-                                          icon={<InfoCircleOutlined />}
-                                          onClick={() => toggleExpandStartup(startup._id)}
-                                          style={{ color: '#7c8099', fontSize: 13 }}
-                                        >
-                                          {expandedStartupId === startup._id ? 'Hide Details' : 'Venture Details'}
-                                        </Button>
-                                        <Button 
-                                          type="primary" 
-                                          icon={<DollarOutlined />}
-                                          disabled={startup.daysLeft === 0}
-                                          onClick={() => handleOpenInvestModal(startup)}
-                                          style={{
-                                            backgroundColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
-                                            borderColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
-                                            color: '#fff',
-                                            borderRadius: 8,
-                                            height: 38,
-                                            fontWeight: 700,
-                                            boxShadow: 'none'
-                                          }}
-                                        >
-                                          {startup.daysLeft === 0 ? 'Closed' : 'Invest'}
-                                        </Button>
-                                      </Space>
+                                    <Progress 
+                                      percent={raisedProgress} 
+                                      showInfo={false} 
+                                      strokeColor="#00d09c"
+                                      trailColor={isDarkMode ? '#374151' : '#f1f5f9'}
+                                      strokeWidth={6}
+                                    />
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
+                                      <Text type="secondary" style={{ fontSize: 11 }}>{startup.totalInvestors?.toLocaleString() || 0} investors</Text>
+                                      <Text type="secondary" style={{ fontSize: 11 }}>Target: ₹{targetFunding.toLocaleString()}</Text>
                                     </div>
                                   </div>
-                                </Card>
-                              </Col>
-                            );
-                          })
-                        )}
-                      </Row>
-                    </Col>
-                    
-                    {/* Live Ticker column */}
-                    <Col xs={24} lg={6}>
-                      <Card 
-                        title={
-                          <Space>
-                            <ClockCircleOutlined style={{ color: '#00d09c' }} />
-                            <span style={{ fontFamily: 'Outfit', fontWeight: 700, fontSize: 14, color: tc }}>Live Market Activity</span>
-                          </Space>
-                        }
-                        style={{ height: '100%', minHeight: 450, background: isDarkMode ? '#121620' : '#ffffff', border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', borderRadius: 12 }}
-                        styles={{ body: { padding: '12px 16px' } }}
-                      >
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 500, overflowY: 'auto' }}>
-                          {activityFeed.map((act) => (
-                            <div key={act.id} style={{ 
-                              padding: '10px 12px', 
-                              borderRadius: 8, 
-                              background: bgInner, 
-                              borderLeft: `3px solid ${act.color || '#00d09c'}`,
-                              fontSize: 12
-                            }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                                <Text style={{ fontWeight: 700, color: tc }}>{act.title}</Text>
-                                <Text type="secondary" style={{ fontSize: 9 }}>{act.time}</Text>
+
+                                  {/* Financial metrics grid */}
+                                  <Row gutter={[8, 8]} style={{ 
+                                    background: bgInner, 
+                                    padding: '12px', 
+                                    borderRadius: 8,
+                                    border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7',
+                                    marginBottom: 16
+                                  }}>
+                                    <Col span={12}>
+                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Min. Investment</Text>
+                                      <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>₹{(startup.minimumInvestment || 0).toLocaleString()}</Text>
+                                    </Col>
+                                    <Col span={12}>
+                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Valuation Cap</Text>
+                                      <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
+                                        ₹{(startup.valuationCap || startup.pastValuations?.[startup.pastValuations.length - 1] || 0).toLocaleString()}
+                                      </Text>
+                                    </Col>
+                                    <Col span={12} style={{ marginTop: 8 }}>
+                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Security Type</Text>
+                                      <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 12, fontWeight: 600 }}>{startup.securityType || 'Crowd SAFE'}</Text>
+                                    </Col>
+                                    <Col span={12} style={{ marginTop: 8 }}>
+                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', textTransform: 'uppercase' }}>Days Left</Text>
+                                      <Text style={{ color: isDarkMode ? '#e2e8f0' : '#1e293b', fontSize: 13, fontWeight: 700 }}>
+                                        {startup.daysLeft > 0 ? `${startup.daysLeft} days` : 'Closed'}
+                                      </Text>
+                                    </Col>
+                                  </Row>
+
+                                  {/* Venture Details (Expandable) */}
+                                  {expandedStartupId === startup._id && (
+                                    <div className="fade-in-section" style={{ borderTop: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', paddingTop: 16, marginBottom: 16 }}>
+                                      <div style={{ marginBottom: 12 }}>
+                                        <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>MARKETING STRATEGY (4 Ps)</Text>
+                                        <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.marketingMixVariables}</Paragraph>
+                                      </div>
+                                      <div>
+                                        <Text style={{ color: isDarkMode ? '#9ca3af' : '#7c8099', fontWeight: 700, fontSize: 11, display: 'block', marginBottom: 2 }}>BUDGETING & SUPPLY CHAIN</Text>
+                                        <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#44475b', fontSize: 12, lineHeight: '1.5', marginBottom: 0 }}>{startup.financialProcurement}</Paragraph>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+                                    <Button 
+                                      type="text" 
+                                      icon={<InfoCircleOutlined />}
+                                      onClick={() => toggleExpandStartup(startup._id)}
+                                      style={{ color: '#7c8099', fontSize: 13 }}
+                                    >
+                                      {expandedStartupId === startup._id ? 'Hide Details' : 'Venture Details'}
+                                    </Button>
+                                    <Button 
+                                      type="primary" 
+                                      icon={<DollarOutlined />}
+                                      disabled={startup.daysLeft === 0}
+                                      onClick={() => handleOpenInvestModal(startup)}
+                                      style={{
+                                        backgroundColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
+                                        borderColor: startup.daysLeft === 0 ? '#cbd5e1' : '#00d09c',
+                                        color: '#fff',
+                                        borderRadius: 8,
+                                        height: 38,
+                                        fontWeight: 700,
+                                        boxShadow: 'none'
+                                      }}
+                                    >
+                                      {startup.daysLeft === 0 ? 'Closed' : 'Invest'}
+                                    </Button>
+                                  </Space>
+                                </div>
                               </div>
-                              <Text type="secondary" style={{ fontSize: 11, color: tSec }}>{act.message}</Text>
-                            </div>
-                          ))}
-                        </div>
-                      </Card>
-                    </Col>
+                            </Card>
+                          </Col>
+                        );
+                      })
+                    )}
                   </Row>
                 </div>
               )
