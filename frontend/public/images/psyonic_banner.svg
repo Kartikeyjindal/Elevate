@@ -1,0 +1,45 @@
+<svg width="800" height="320" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad_PSYONIC" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4338ca;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="320" rx="16" fill="url(#grad_PSYONIC)" />
+
+  <!-- Decorative Abstract Circles -->
+  <circle cx="750" cy="80" r="160" fill="#ffffff" opacity="0.04" />
+  <circle cx="50" cy="280" r="120" fill="#ffffff" opacity="0.03" />
+  <path d="M-50 160 C100 80 200 240 350 160 C500 80 650 240 850 160" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.04" />
+
+  <!-- Category Badge -->
+  <g transform="translate(60, 65)">
+    <rect width="260" height="28" rx="14" fill="#ffffff" opacity="0.12" />
+    <text x="12" y="18" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="11" font-weight="700" letter-spacing="1" opacity="0.95">BIOTECH / ROBOTICS</text>
+  </g>
+
+  <!-- Branding Text -->
+  <text x="60" y="160" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="52" font-weight="900" letter-spacing="-1.5" filter="url(#glow)">PSYONIC</text>
+  <text x="60" y="215" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="20" font-weight="500" opacity="0.85">Bionic limbs for the next generation.</text>
+
+  <!-- Stylized Icon Container -->
+  <g transform="translate(640, 90) scale(1.4)">
+    <circle cx="45" cy="65" r="40" fill="#ffffff" opacity="0.08" />
+    
+      <!-- Stylized Robotic Arm / Hand -->
+      <g stroke="#60a5fa" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M40 70 h20 l10 -15 h15" />
+        <path d="M40 85 h25 l12 -10 h15" />
+        <path d="M40 100 h20 l10 15 h15" />
+        <rect x="25" y="60" width="15" height="50" rx="3" fill="#60a5fa" opacity="0.2" />
+        <circle cx="32" cy="85" r="4" fill="#60a5fa" />
+      </g>
+    
+  </g>
+</svg>

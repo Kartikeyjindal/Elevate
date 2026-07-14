@@ -1,0 +1,48 @@
+<svg width="800" height="320" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad_Piestro" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c2d12;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="320" rx="16" fill="url(#grad_Piestro)" />
+
+  <!-- Decorative Abstract Circles -->
+  <circle cx="750" cy="80" r="160" fill="#ffffff" opacity="0.04" />
+  <circle cx="50" cy="280" r="120" fill="#ffffff" opacity="0.03" />
+  <path d="M-50 160 C100 80 200 240 350 160 C500 80 650 240 850 160" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.04" />
+
+  <!-- Category Badge -->
+  <g transform="translate(60, 65)">
+    <rect width="260" height="28" rx="14" fill="#ffffff" opacity="0.12" />
+    <text x="12" y="18" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="11" font-weight="700" letter-spacing="1" opacity="0.95">FOODTECH / AUTOMATION</text>
+  </g>
+
+  <!-- Branding Text -->
+  <text x="60" y="160" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="52" font-weight="900" letter-spacing="-1.5" filter="url(#glow)">Piestro</text>
+  <text x="60" y="215" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="20" font-weight="500" opacity="0.85">Automated artisanal pizza maker.</text>
+
+  <!-- Stylized Icon Container -->
+  <g transform="translate(640, 90) scale(1.4)">
+    <circle cx="45" cy="65" r="40" fill="#ffffff" opacity="0.08" />
+    
+      <!-- Pizza and Gears -->
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="45" cy="65" r="22" stroke="#fbbf24" stroke-width="4" fill="#fbbf24" opacity="0.1" />
+        <path d="M45 65 L45 43 M45 65 L60 80 M45 65 L27 75" stroke="#fbbf24" stroke-width="3" />
+        <!-- Pizza crust edge segment -->
+        <path d="M23 65 C23 45 40 28 60 30" stroke="#f87171" stroke-width="4" />
+        <!-- Pepperoni dots -->
+        <circle cx="35" cy="53" r="3" fill="#f87171" />
+        <circle cx="55" cy="58" r="3" fill="#f87171" />
+        <circle cx="48" cy="75" r="3" fill="#f87171" />
+      </g>
+    
+  </g>
+</svg>

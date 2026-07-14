@@ -25,23 +25,23 @@ const logoMap = {
   'Doroni Aerospace':         '/images/doroni_banner.png',
   'BOXABL':                   '/images/boxabl_banner.png',
   'Legion M Entertainment':   '/images/legionm_banner.png',
-  'PSYONIC':                  '/images/knightscope_banner.png',
-  'Cheers Health':            '/images/happiness_banner.png',
-  'Greenfield Robotics':      '/images/bharat_krishi_banner.png',
-  'Virtuix':                  '/images/edtech_banner.png',
-  'GoSun':                    '/images/cleanwater_banner.png',
-  'Fire Department Coffee':   '/images/gumroad_banner.png',
-  'Flower Turbines':          '/images/quantum_grid_banner.png',
-  'Piestro':                  '/images/sportsbra_banner.png',
-  'Trade Algo':               '/images/atombeam_banner.png',
-  'Apis Cor':                 '/images/rover_banner.png',
-  'Eli Electric Vehicles':    '/images/doroni_banner.png',
-  'Honeybee Burger':          '/images/finless_banner.png',
-  'SapientX':                 '/images/liquidpiston_banner.png',
+  'PSYONIC':                  '/images/psyonic_banner.svg',
+  'Cheers Health':            '/images/cheers_banner.svg',
+  'Greenfield Robotics':      '/images/greenfield_rob_banner.svg',
+  'Virtuix':                  '/images/virtuix_banner.svg',
+  'GoSun':                    '/images/gosun_banner.svg',
+  'Fire Department Coffee':   '/images/firedept_banner.svg',
+  'Flower Turbines':          '/images/flower_turbines_banner.svg',
+  'Piestro':                  '/images/piestro_banner.svg',
+  'Trade Algo':               '/images/tradealgo_banner.svg',
+  'Apis Cor':                 '/images/apiscor_banner.svg',
+  'Eli Electric Vehicles':    '/images/eliev_banner.svg',
+  'Honeybee Burger':          '/images/honeybee_banner.svg',
+  'SapientX':                 '/images/sapientx_banner.svg',
 };
 
 async function run() {
-  await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/elevate');
+  await mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/crowdfunding');
   console.log('Connected to MongoDB');
 
   let updated = 0;

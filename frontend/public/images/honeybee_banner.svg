@@ -1,0 +1,46 @@
+<svg width="800" height="320" viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad_Honeybee_Burger" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#78350f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#84cc16;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="320" rx="16" fill="url(#grad_Honeybee_Burger)" />
+
+  <!-- Decorative Abstract Circles -->
+  <circle cx="750" cy="80" r="160" fill="#ffffff" opacity="0.04" />
+  <circle cx="50" cy="280" r="120" fill="#ffffff" opacity="0.03" />
+  <path d="M-50 160 C100 80 200 240 350 160 C500 80 650 240 850 160" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.04" />
+
+  <!-- Category Badge -->
+  <g transform="translate(60, 65)">
+    <rect width="260" height="28" rx="14" fill="#ffffff" opacity="0.12" />
+    <text x="12" y="18" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="11" font-weight="700" letter-spacing="1" opacity="0.95">FOODTECH / PLANT-BASED</text>
+  </g>
+
+  <!-- Branding Text -->
+  <text x="60" y="160" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="52" font-weight="900" letter-spacing="-1.5" filter="url(#glow)">Honeybee Burger</text>
+  <text x="60" y="215" fill="#ffffff" font-family="'Outfit', 'Inter', sans-serif" font-size="20" font-weight="500" opacity="0.85">Delicious plant-based burgers.</text>
+
+  <!-- Stylized Icon Container -->
+  <g transform="translate(640, 90) scale(1.4)">
+    <circle cx="45" cy="65" r="40" fill="#ffffff" opacity="0.08" />
+    
+      <!-- Bee and Burger leaf -->
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <!-- Bee shape -->
+        <circle cx="35" cy="55" r="10" stroke="#eab308" stroke-width="3" fill="#eab308" opacity="0.3" />
+        <path d="M35 45 C35 38 42 38 42 45 M35 55 h10 M35 50 h8 M35 60 h8" stroke="#78350f" stroke-width="2" />
+        <circle cx="45" cy="50" r="3" fill="#78350f" />
+        <!-- Green leaf for plant-based -->
+        <path d="M50 70 C60 70 65 60 55 55 C45 60 45 70 50 70 Z" fill="#86efac" stroke="#4ade80" stroke-width="2" />
+      </g>
+    
+  </g>
+</svg>
