@@ -4,6 +4,7 @@ import { ConfigProvider, theme } from 'antd';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import InvestorDashboard from './pages/InvestorDashboard';
+import PlatformInfo from './pages/PlatformInfo';
 import AdminDashboard from './pages/AdminDashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import StartupApplication from './pages/StartupApplication';
@@ -117,6 +118,15 @@ function App() {
             element={
               <ProtectedRoute allowedRole="investor">
                 <InvestorDashboard />
+              </ProtectedRoute>
+            } 
+          />
+
+          <Route 
+            path="/investor/info/:topicId" 
+            element={
+              <ProtectedRoute allowedRole="investor">
+                <PlatformInfo />
               </ProtectedRoute>
             } 
           />

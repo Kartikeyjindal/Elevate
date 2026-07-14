@@ -14,7 +14,7 @@ import {
   SafetyCertificateOutlined, SwapOutlined, KeyOutlined, TransactionOutlined,
   SunOutlined, MoonOutlined, UserOutlined, SettingOutlined, ClockCircleOutlined
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import useIdleTimeout, { getIdleTimeoutMinutes, setIdleTimeoutMinutes } from '../hooks/useIdleTimeout';
 
 const { Header, Content, Footer } = Layout;
@@ -1781,14 +1781,14 @@ export default function InvestorDashboard() {
             <Col xs={12} sm={8} md={6}>
               <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>ELEVATE</Title>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                <a href="#about" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>About Us</a>
-                <a href="#pricing" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Pricing</a>
-                <a href="#insights" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Venture Insights</a>
-                <a href="#media" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Media & Press</a>
-                <a href="#careers" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Careers</a>
-                <a href="#help" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Help & Support</a>
-                <a href="#safety" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Trust & Safety</a>
-                <a href="#investor-relations" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Investor Relations</a>
+                <Link to="/investor/info/about-us" style={{ color: tSec }}>About Us</Link>
+                <Link to="/investor/info/pricing" style={{ color: tSec }}>Pricing</Link>
+                <Link to="/investor/info/venture-insights" style={{ color: tSec }}>Venture Insights</Link>
+                <Link to="/investor/info/media" style={{ color: tSec }}>Media & Press</Link>
+                <Link to="/investor/info/careers" style={{ color: tSec }}>Careers</Link>
+                <Link to="/investor/info/help" style={{ color: tSec }}>Help & Support</Link>
+                <Link to="/investor/info/safety" style={{ color: tSec }}>Trust & Safety</Link>
+                <Link to="/investor/info/investor-relations" style={{ color: tSec }}>Investor Relations</Link>
               </div>
             </Col>
 
@@ -1796,14 +1796,14 @@ export default function InvestorDashboard() {
             <Col xs={12} sm={8} md={6}>
               <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>PRODUCTS</Title>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                <a href="#crowdfunding" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Equity Crowdfunding</a>
-                <a href="#funds" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Startup Mutual Funds</a>
-                <a href="#debt" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Venture Debt</a>
-                <a href="#secondary" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Secondary Market</a>
-                <a href="#terminal" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Elevate Terminal</a>
-                <a href="#angel" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Angel Pools</a>
-                <a href="#commodities" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Carbon Credits</a>
-                <a href="#pms" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>PMS Services</a>
+                <Link to="/investor/info/equity-crowdfunding" style={{ color: tSec }}>Equity Crowdfunding</Link>
+                <Link to="/investor/info/startup-mutual-funds" style={{ color: tSec }}>Startup Mutual Funds</Link>
+                <Link to="/investor/info/venture-debt" style={{ color: tSec }}>Venture Debt</Link>
+                <Link to="/investor/info/secondary-market" style={{ color: tSec }}>Secondary Market</Link>
+                <Link to="/investor/info/elevate-terminal" style={{ color: tSec }}>Elevate Terminal</Link>
+                <Link to="/investor/info/angel-pools" style={{ color: tSec }}>Angel Pools</Link>
+                <Link to="/investor/info/commodities" style={{ color: tSec }}>Carbon Credits</Link>
+                <Link to="/investor/info/pms-services" style={{ color: tSec }}>PMS Services</Link>
               </div>
             </Col>
 
@@ -1811,14 +1811,14 @@ export default function InvestorDashboard() {
             <Col xs={24} sm={8} md={6}>
               <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', marginBottom: 16, letterSpacing: 0.5 }}>RESOURCES & FEATURES</Title>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13 }}>
-                <a href="#labs" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>DTU Labs Partner</a>
-                <a href="#incubator" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Startup Incubator</a>
-                <a href="#tracker" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Portfolio Tracker</a>
-                <a href="#feed" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Live Activity Feed</a>
-                <a href="#simulator" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Valuation Simulator</a>
-                <a href="#kyc" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Smart KYC Portal</a>
-                <a href="#news" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Market News Digest</a>
-                <a href="#expert" style={{ color: tSec }} onClick={(e) => e.preventDefault()}>Expert Q&A Panel</a>
+                <Link to="/investor/info/dtu-labs" style={{ color: tSec }}>DTU Labs Partner</Link>
+                <Link to="/investor/info/startup-incubator" style={{ color: tSec }}>Startup Incubator</Link>
+                <Link to="/investor/info/portfolio-tracker" style={{ color: tSec }}>Portfolio Tracker</Link>
+                <Link to="/investor/info/live-activity" style={{ color: tSec }}>Live Activity Feed</Link>
+                <Link to="/investor/info/valuation-simulator" style={{ color: tSec }}>Valuation Simulator</Link>
+                <Link to="/investor/info/smart-kyc" style={{ color: tSec }}>Smart KYC Portal</Link>
+                <Link to="/investor/info/market-news" style={{ color: tSec }}>Market News Digest</Link>
+                <Link to="/investor/info/expert-panel" style={{ color: tSec }}>Expert Q&A Panel</Link>
               </div>
             </Col>
           </Row>
@@ -1831,7 +1831,7 @@ export default function InvestorDashboard() {
               © 2016-2026 Elevate Equity. All rights reserved.
             </Text>
             <Text type="secondary" style={{ fontSize: 11 }}>
-              Version 1.2.4 (Antigravity Core)
+              Version 1.2.4
             </Text>
           </div>
         </div>
