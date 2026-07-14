@@ -263,23 +263,17 @@ body.dark .leaderboard-me-row {
 /* Horizontal slide ticker animation (fades/drifts left to right, then disappears) */
 @keyframes slideLeftToRight {
   0% {
-    left: 0%;
-    transform: translateX(-100%);
+    left: -40%;
     opacity: 0;
   }
   15% {
-    left: 15%;
-    transform: translateX(0%);
     opacity: 1;
   }
   85% {
-    left: 85%;
-    transform: translateX(0%);
     opacity: 1;
   }
   100% {
     left: 100%;
-    transform: translateX(0%);
     opacity: 0;
   }
 }

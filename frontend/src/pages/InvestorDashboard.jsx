@@ -285,12 +285,12 @@ export default function InvestorDashboard() {
 
   const [currentActivityIndex, setCurrentActivityIndex] = useState(0);
 
-  // Hook for rotating the active ticker activity every 4 seconds
+  // Hook for rotating the active ticker activity every 8 seconds
   useEffect(() => {
     if (activityFeed.length === 0) return;
     const interval = setInterval(() => {
       setCurrentActivityIndex(prev => (prev + 1) % activityFeed.length);
-    }, 4000);
+    }, 8000);
     return () => clearInterval(interval);
   }, [activityFeed]);
 
@@ -1325,7 +1325,7 @@ export default function InvestorDashboard() {
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      animation: 'slideLeftToRight 4s linear forwards',
+                      animation: 'slideLeftToRight 8s linear forwards',
                       whiteSpace: 'nowrap',
                       position: 'absolute',
                       left: 0
