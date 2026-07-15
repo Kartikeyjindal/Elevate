@@ -253,8 +253,7 @@ export default function InvestorDashboard() {
   const [togglingWatchlist, setTogglingWatchlist] = useState(new Set());
   const [marketplaceSubTab, setMarketplaceSubTab] = useState('all'); // 'all' | 'watchlist'
 
-  // Feature 5: Investment Timeline
-  const [timelineFilter, setTimelineFilter] = useState('all'); // 'all' | 'investments' | 'deposits' | 'withdrawals'
+
 
   // Feature 10: Founder Q&A / Updates
   const [companyUpdates, setCompanyUpdates] = useState([]);
@@ -1694,49 +1693,6 @@ export default function InvestorDashboard() {
     return `M 10 90 L ${svgPoints.map(p => `${p.x} ${p.y}`).join(" L ")} L 290 90 Z`;
   }, [svgPoints]);
 
-  // Feature 5: Merged chronological timeline events
-  const timelineEvents = React.useMemo(() => {
-    const events = [];
-
-    // 1. Process investments
-    if (Array.isArray(myInvestments)) {
-      // We will loop through the original myInvestments array to show actual raw transaction events
-      myInvestments.forEach(inv => {
-        const isSip = inv.note && inv.note.includes('SIP');
-        events.push({
-          id: `inv-${inv._id || Math.random()}`,
-          type: isSip ? 'sip' : 'investment',
-          title: isSip ? `SIP Instalment` : `Direct Investment`,
-          startupName: inv.startupId?.name || inv.startupName || 'Venture',
-          amount: inv.amount,
-          date: new Date(inv.timestamp || inv.createdAt),
-          description: isSip ? inv.note : `Pledged capital to ${inv.startupId?.name || inv.startupName || 'Venture'}`
-        });
-      });
-    }
-
-    // 2. Process wallet transactions
-    if (Array.isArray(walletTransactions)) {
-      walletTransactions.forEach(tx => {
-        // Skip investment type transactions since we already processed them directly from myInvestments to avoid duplicate display
-        if (tx.type === 'investment') return;
-        
-        events.push({
-          id: `tx-${tx._id || Math.random()}`,
-          type: tx.type, // 'deposit' or 'withdraw'
-          title: tx.type === 'deposit' ? 'Wallet Deposit' : 'Wallet Withdrawal',
-          startupName: null,
-          amount: tx.amount,
-          date: new Date(tx.timestamp || tx.createdAt),
-          description: tx.description || (tx.type === 'deposit' ? 'Funds added to account' : 'Funds withdrawn from account')
-        });
-      });
-    }
-
-    // Sort descending by date
-    return events.sort((a, b) => b.date - a.date);
-  }, [myInvestments, walletTransactions]);
-
   // Group investments by company to combine duplicates
   const groupedHoldings = React.useMemo(() => {
     if (!myInvestments || myInvestments.length === 0) return [];
@@ -2635,149 +2591,6 @@ export default function InvestorDashboard() {
                       scroll={{ x: true }}
                     />
                   </Card>
-
-                  {/* Feature 5: Chronological Activity Timeline */}
-                  {(() => {
-                    const filteredEvents = timelineEvents.filter(evt => {
-                      if (timelineFilter === 'all') return true;
-                      if (timelineFilter === 'investments') return evt.type === 'investment' || evt.type === 'sip';
-                      if (timelineFilter === 'deposits') return evt.type === 'deposit';
-                      if (timelineFilter === 'withdrawals') return evt.type === 'withdraw';
-                      if (timelineFilter === 'sip') return evt.type === 'sip';
-                      return true;
-                    });
-
-                    return (
-                      <Card style={{ marginTop: 24, background: bgInner, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
-                          <div>
-                            <Title level={4} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 16 }}>
-                              📜 Chronological Activity Timeline
-                            </Title>
-                            <Paragraph type="secondary" style={{ fontSize: 12, margin: 0, marginTop: 4 }}>
-                              Track all deposits, investments, SIPs, and exits in real-time.
-                            </Paragraph>
-                          </div>
-
-                          {/* Filter Chips */}
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            {[
-                              { label: 'All', value: 'all' },
-                              { label: 'Investments', value: 'investments' },
-                              { label: 'Deposits', value: 'deposits' },
-                              { label: 'SIPs', value: 'sip' },
-                              { label: 'Withdrawals', value: 'withdrawals' }
-                            ].map(chip => (
-                              <Tag
-                                key={chip.value}
-                                color={timelineFilter === chip.value ? 'green' : 'default'}
-                                onClick={() => setTimelineFilter(chip.value)}
-                                style={{ 
-                                  cursor: 'pointer', 
-                                  padding: '4px 12px', 
-                                  borderRadius: 20, 
-                                  fontWeight: 600,
-                                  fontSize: 12,
-                                  border: timelineFilter === chip.value ? '1px solid #00d09c' : `1px solid ${borderCl}`,
-                                  background: timelineFilter === chip.value ? 'rgba(0, 208, 156, 0.1)' : 'transparent',
-                                  color: timelineFilter === chip.value ? '#00d09c' : tc
-                                }}
-                              >
-                                {chip.label}
-                              </Tag>
-                            ))}
-                          </div>
-                        </div>
-
-                        {filteredEvents.length === 0 ? (
-                          <div style={{ textAlign: 'center', padding: '36px 0', color: '#7c8099' }}>
-                            No activity events match the selected filter.
-                          </div>
-                        ) : (
-                          <div style={{ position: 'relative', paddingLeft: 24, borderLeft: `2px solid ${borderCl}`, marginLeft: 12, display: 'flex', flexDirection: 'column', gap: 24, marginTop: 12 }}>
-                            {filteredEvents.map((evt) => {
-                              let color = '#00d09c';
-                              let icon = '💼';
-                              if (evt.type === 'deposit') {
-                                color = '#3b82f6';
-                                icon = '💰';
-                              } else if (evt.type === 'withdraw') {
-                                color = '#f59e0b';
-                                icon = '📤';
-                              } else if (evt.type === 'sip') {
-                                color = '#8b5cf6';
-                                icon = '🛒';
-                              }
-
-                              return (
-                                <div key={evt.id} style={{ position: 'relative' }}>
-                                  {/* Timeline Point */}
-                                  <div style={{ 
-                                    position: 'absolute', 
-                                    left: -36, 
-                                    top: 2, 
-                                    width: 24, 
-                                    height: 24, 
-                                    borderRadius: '50%', 
-                                    background: isDarkMode ? '#1e293b' : '#ffffff', 
-                                    border: `2px solid ${color}`, 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center',
-                                    fontSize: 12,
-                                    zIndex: 1
-                                  }}>
-                                    {icon}
-                                  </div>
-
-                                  {/* Content */}
-                                  <div style={{ 
-                                    background: bgCard, 
-                                    padding: '14px 18px', 
-                                    borderRadius: 10, 
-                                    border: `1px solid ${borderCl}`,
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    flexWrap: 'wrap',
-                                    gap: 12
-                                  }}>
-                                    <div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                                        <Text style={{ fontWeight: 800, color: tc, fontSize: 14 }}>
-                                          {evt.title}
-                                        </Text>
-                                        {evt.startupName && (
-                                          <Tag color="cyan" style={{ fontWeight: 600, fontSize: 10, borderRadius: 4 }}>
-                                            {evt.startupName}
-                                          </Tag>
-                                        )}
-                                      </div>
-                                      <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
-                                        {evt.description}
-                                      </Text>
-                                    </div>
-
-                                    <div style={{ textAlign: 'right' }}>
-                                      <Text style={{ 
-                                        fontSize: 16, 
-                                        fontWeight: 800, 
-                                        color: evt.type === 'withdraw' ? '#f59e0b' : (evt.type === 'deposit' ? '#3b82f6' : '#00d09c') 
-                                      }}>
-                                        {evt.type === 'withdraw' ? '-' : '+'} ₹{evt.amount.toLocaleString()}
-                                      </Text>
-                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
-                                        {evt.date.toLocaleDateString()} · {evt.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                      </Text>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </Card>
-                    );
                   })()}
                 </div>
               )
