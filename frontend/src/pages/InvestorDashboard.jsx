@@ -12,7 +12,8 @@ import {
   SearchOutlined, ArrowUpOutlined, ArrowDownOutlined, InfoCircleOutlined, BookOutlined,
   CreditCardOutlined, BankOutlined, QrcodeOutlined, CheckCircleOutlined, LoadingOutlined,
   SafetyCertificateOutlined, SwapOutlined, KeyOutlined, TransactionOutlined,
-  SunOutlined, MoonOutlined, UserOutlined, SettingOutlined, ClockCircleOutlined
+  SunOutlined, MoonOutlined, UserOutlined, SettingOutlined, ClockCircleOutlined,
+  RobotOutlined, ShoppingOutlined, ThunderboltOutlined, BulbOutlined
 } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import useIdleTimeout, { getIdleTimeoutMinutes, setIdleTimeoutMinutes } from '../hooks/useIdleTimeout';
@@ -20,6 +21,17 @@ import useIdleTimeout, { getIdleTimeoutMinutes, setIdleTimeoutMinutes } from '..
 const { Header, Content, Footer } = Layout;
 const { Title, Text, Paragraph } = Typography;
 
+
+// Helper for basket icons mapping
+const getBasketIcon = (iconName) => {
+  switch (iconName) {
+    case 'RobotOutlined': return <RobotOutlined style={{ fontSize: 24, color: '#3b82f6' }} />;
+    case 'ShoppingOutlined': return <ShoppingOutlined style={{ fontSize: 24, color: '#ec4899' }} />;
+    case 'TransactionOutlined': return <TransactionOutlined style={{ fontSize: 24, color: '#fbbf24' }} />;
+    case 'EcoOutlined': return <BulbOutlined style={{ fontSize: 24, color: '#10b981' }} />;
+    default: return <FundOutlined style={{ fontSize: 24, color: '#00d09c' }} />;
+  }
+};
 
 // Groww-style Mint Green Sparkline Component
 function Sparkline({ data }) {
@@ -226,6 +238,13 @@ export default function InvestorDashboard() {
   const [blogs, setBlogs] = useState([]);
   const [marketNews, setMarketNews] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
+  const [allocationView, setAllocationView] = useState('chart');
+  const [baskets, setBaskets] = useState([]);
+  const [basketsLoading, setBasketsLoading] = useState(false);
+  const [basketModalVisible, setBasketModalVisible] = useState(false);
+  const [selectedBasket, setSelectedBasket] = useState(null);
+  const [basketInvestAmount, setBasketInvestAmount] = useState(10000);
+  const [submittingBasketInvest, setSubmittingBasketInvest] = useState(false);
 
   // States for Dynamic Valuation Sliders & Live Activity Feed
   const [projectionGrowth, setProjectionGrowth] = useState(25);
@@ -822,6 +841,22 @@ export default function InvestorDashboard() {
         setMarketNews(newsData);
       }
       setNewsLoading(false);
+
+      // Fetch baskets
+      setBasketsLoading(true);
+      try {
+        const basketsRes = await fetch(`${API_URL}/api/baskets`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (basketsRes.ok) {
+          const basketsData = await basketsRes.json();
+          setBaskets(basketsData);
+        }
+      } catch (err) {
+        console.error('Failed to load baskets:', err);
+      }
+      setBasketsLoading(false);
+
       // Fetch wallet transactions
       setLoadingTransactions(true);
       try {
@@ -982,6 +1017,57 @@ export default function InvestorDashboard() {
       message.error('Error fetching company details.');
     } finally {
       setCompanyDetailsLoading(false);
+    }
+  };
+
+  const handleOpenBasketInvestModal = (basket) => {
+    setSelectedBasket(basket);
+    setBasketInvestAmount(5000); // Default minimum
+    setBasketModalVisible(true);
+  };
+
+  const handleConfirmBasketInvestment = async () => {
+    if (basketInvestAmount < 5000) {
+      message.error("Minimum investment in a basket is ₹5,000");
+      return;
+    }
+
+    if (currentUser.walletBalance < basketInvestAmount) {
+      message.error("Insufficient wallet balance");
+      return;
+    }
+
+    setSubmittingBasketInvest(true);
+    const token = localStorage.getItem('token');
+    
+    try {
+      const res = await fetch(`${API_URL}/api/baskets/invest`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          basketId: selectedBasket.id,
+          totalAmount: basketInvestAmount
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        message.success(data.message || `Successfully invested ₹${basketInvestAmount.toLocaleString()} in the basket!`);
+        setBasketModalVisible(false);
+        // Refresh dashboard data to reflect wallet and investments
+        fetchData();
+      } else {
+        const data = await res.json();
+        message.error(data.error || "Failed to complete basket investment");
+      }
+    } catch (err) {
+      console.error(err);
+      message.error("An error occurred during basket investment");
+    } finally {
+      setSubmittingBasketInvest(false);
     }
   };
 
@@ -1343,6 +1429,48 @@ export default function InvestorDashboard() {
 
   const sectorSegments = getSectorExposureData();
 
+  // Calculate Sector Heatmap metrics (including ROI per sector)
+  const sectorHeatmapData = React.useMemo(() => {
+    if (!myInvestments || myInvestments.length === 0) return [];
+    
+    const categories = {};
+    myInvestments.forEach(inv => {
+      const startup = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+      const cat = startup ? startup.category : 'General';
+      if (!categories[cat]) {
+        categories[cat] = {
+          category: cat,
+          capital: 0,
+          currentValuation: 0,
+        };
+      }
+      categories[cat].capital += inv.amount;
+      
+      // Calculate current valuation of this investment
+      const valuations = [...(startup?.pastValuations || [])];
+      if (valuations.length === 0 || valuations[valuations.length - 1] !== startup?.valuationCap) {
+        if (startup?.valuationCap) {
+          valuations.push(startup.valuationCap);
+        }
+      }
+      let currentVal = inv.amount;
+      if (valuations.length > 1) {
+        const startVal = valuations[0] || 1;
+        const endVal = valuations[valuations.length - 1] || 1;
+        currentVal = inv.amount * (endVal / startVal);
+      }
+      categories[cat].currentValuation += currentVal;
+    });
+
+    return Object.values(categories).map(c => {
+      const roi = c.capital > 0 ? ((c.currentValuation - c.capital) / c.capital) * 100 : 0;
+      return {
+        ...c,
+        roi
+      };
+    }).sort((a, b) => b.currentValuation - a.currentValuation);
+  }, [myInvestments, startups]);
+
   // Calculate Portfolio Trajectory dynamically
   const trajectoryData = React.useMemo(() => {
     if (!myInvestments || myInvestments.length === 0) {
@@ -1692,6 +1820,106 @@ export default function InvestorDashboard() {
                     </Col>
                   </Row>
 
+                  {/* Curated Startup Mutual Funds (Baskets) */}
+                  {baskets && baskets.length > 0 && (
+                    <div style={{ marginBottom: 40 }}>
+                      <Title level={4} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 800, marginBottom: 4 }}>
+                        📦 Curated Startup Mutual Funds (Baskets)
+                      </Title>
+                      <Paragraph type="secondary" style={{ fontSize: 13, marginBottom: 20 }}>
+                        Diversify your portfolio with a single click. Invest in themed baskets automatically distributed across top-performing, vetted startups.
+                      </Paragraph>
+                      <Row gutter={[20, 20]}>
+                        {baskets.map((basket) => (
+                          <Col xs={24} md={12} key={basket.id}>
+                            <Card 
+                              style={{ 
+                                background: bgInner, 
+                                border: `1px solid ${borderCl}`, 
+                                borderRadius: 12, 
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between'
+                              }}
+                              bodyStyle={{ padding: 20, display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}
+                            >
+                              <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                                  <div style={{ 
+                                    width: 44, 
+                                    height: 44, 
+                                    borderRadius: 8, 
+                                    background: isDarkMode ? '#1e293b' : '#f1f5f9', 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center' 
+                                  }}>
+                                    {getBasketIcon(basket.icon)}
+                                  </div>
+                                  <div>
+                                    <Text style={{ fontSize: 15, fontWeight: 800, color: tc, display: 'block' }}>
+                                      {basket.name}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#7c8099', fontWeight: 600 }}>
+                                      {basket.constituents.length} Startup Constituents
+                                    </Text>
+                                  </div>
+                                </div>
+                                <Paragraph style={{ fontSize: 12, color: isDarkMode ? '#cbd5e1' : '#4b5563', minHeight: 40, lineHeight: 1.5 }}>
+                                  {basket.tagline}
+                                </Paragraph>
+                                
+                                <div style={{ 
+                                  background: isDarkMode ? '#121824' : '#f8fafc', 
+                                  borderRadius: 8, 
+                                  padding: 10, 
+                                  marginBottom: 16,
+                                  border: `1px dashed ${borderCl}`
+                                }}>
+                                  <Text style={{ fontSize: 11, fontWeight: 700, color: tc, display: 'block', marginBottom: 6 }}>
+                                    Basket Weights & Allocations:
+                                  </Text>
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                                    {basket.constituents.map((item, idx) => (
+                                      <Tag 
+                                        key={idx} 
+                                        color={isDarkMode ? 'blue' : 'processing'} 
+                                        style={{ fontSize: 10, padding: '2px 8px', borderRadius: 4, fontWeight: 600 }}
+                                      >
+                                        {item.name}: <strong style={{ color: '#00d09c' }}>{item.weight}%</strong>
+                                      </Tag>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                              <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>MINIMUM INVESTMENT</Text>
+                                  <Text style={{ fontSize: 16, fontWeight: 800, color: '#00d09c' }}>₹5,000</Text>
+                                </div>
+                                <Button 
+                                  type="primary" 
+                                  icon={<DollarOutlined />}
+                                  onClick={() => handleOpenBasketInvestModal(basket)}
+                                  style={{ 
+                                    backgroundColor: '#00d09c', 
+                                    borderColor: '#00d09c', 
+                                    borderRadius: 6, 
+                                    fontWeight: 700 
+                                  }}
+                                >
+                                  Invest in Basket
+                                </Button>
+                              </div>
+                            </Card>
+                          </Col>
+                        ))}
+                      </Row>
+                      <Divider style={{ margin: '32px 0' }} />
+                    </div>
+                  )}
+
                   {/* Startup Marketplace Grid */}
                   <Row gutter={[20, 20]}>
                     {filteredStartups.length === 0 ? (
@@ -1938,16 +2166,29 @@ export default function InvestorDashboard() {
                     {/* Left: Donut Chart */}
                     <Col xs={24} md={12}>
                       <Card style={{ background: bgInner, border: `1px solid ${borderCl}`, minHeight: 280 }}>
-                        <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: '0 0 16px 0', fontSize: 14 }}>
-                          🍰 Asset Allocation & Sector Exposure
-                        </Title>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                          <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 14 }}>
+                            📊 Allocation & Sector Performance
+                          </Title>
+                          {myInvestments.length > 0 && (
+                            <Radio.Group 
+                              size="small" 
+                              value={allocationView} 
+                              onChange={(e) => setAllocationView(e.target.value)}
+                              buttonStyle="solid"
+                            >
+                              <Radio.Button value="chart">Pie Chart</Radio.Button>
+                              <Radio.Button value="heatmap">Heatmap</Radio.Button>
+                            </Radio.Group>
+                          )}
+                        </div>
                         {myInvestments.length === 0 ? (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 180, textAlign: 'center', padding: '0 16px' }}>
                             <PieChartOutlined style={{ fontSize: 36, color: '#00d09c', marginBottom: 12, opacity: 0.8 }} />
                             <Text style={{ color: tc, fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>No Holdings Found</Text>
                             <Text type="secondary" style={{ fontSize: 11 }}>Deploy capital from the Marketplace tab to unlock sector allocation insights.</Text>
                           </div>
-                        ) : (
+                        ) : allocationView === 'chart' ? (
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: 16 }}>
                             <div style={{ position: 'relative', width: 130, height: 130 }}>
                               <svg width="130" height="130" viewBox="0 0 42 42">
@@ -1988,6 +2229,67 @@ export default function InvestorDashboard() {
                                   </span>
                                 </div>
                               ))}
+                            </div>
+                          </div>
+                        ) : (
+                          // Render Sector Heatmap Grid
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 4 }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8 }}>
+                              {sectorHeatmapData.map((sm, index) => {
+                                let boxBg = '#121824';
+                                let boxBorder = '#1f2937';
+                                if (sm.roi > 15) {
+                                  boxBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.08)';
+                                  boxBorder = '#10b981';
+                                } else if (sm.roi > 5) {
+                                  boxBg = isDarkMode ? 'rgba(16, 185, 129, 0.08)' : 'rgba(16, 185, 129, 0.04)';
+                                  boxBorder = '#059669';
+                                } else if (sm.roi >= 0) {
+                                  boxBg = isDarkMode ? 'rgba(16, 185, 129, 0.03)' : 'rgba(16, 185, 129, 0.02)';
+                                  boxBorder = '#34d399';
+                                } else {
+                                  boxBg = isDarkMode ? 'rgba(239, 68, 68, 0.12)' : 'rgba(239, 68, 68, 0.06)';
+                                  boxBorder = '#ef4444';
+                                }
+                                
+                                const totalVal = sectorHeatmapData.reduce((acc, curr) => acc + curr.currentValuation, 0);
+                                const pctShare = totalVal > 0 ? (sm.currentValuation / totalVal) * 100 : 0;
+                                
+                                return (
+                                  <div 
+                                    key={index} 
+                                    style={{
+                                      background: boxBg,
+                                      border: `1.5px solid ${boxBorder}`,
+                                      borderRadius: 8,
+                                      padding: '10px 12px',
+                                      display: 'flex',
+                                      flexDirection: 'column',
+                                      justifyContent: 'space-between',
+                                      minHeight: 90,
+                                      transition: 'all 0.2s',
+                                      cursor: 'default'
+                                    }}
+                                  >
+                                    <div>
+                                      <Text style={{ display: 'block', fontSize: 10, color: '#7c8099', textTransform: 'uppercase', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {sm.category}
+                                      </Text>
+                                      <Text style={{ display: 'block', color: tc, fontWeight: 800, fontSize: 14, marginTop: 2 }}>
+                                        ₹{Math.round(sm.currentValuation).toLocaleString()}
+                                      </Text>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                                      <Tag color={sm.roi >= 0 ? 'green' : 'red'} style={{ fontSize: 9, fontWeight: 700, margin: 0, borderRadius: 4, padding: '0 4px' }}>
+                                        {sm.roi >= 0 ? '+' : ''}{sm.roi.toFixed(1)}% ROI
+                                      </Tag>
+                                      <Text style={{ fontSize: 10, color: '#7c8099', fontWeight: 600 }}>
+                                        {pctShare.toFixed(0)}%
+                                      </Text>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         )}
@@ -2427,6 +2729,98 @@ export default function InvestorDashboard() {
         <Text type="secondary" style={{ color: '#7c8099', fontSize: 12, display: 'block', marginTop: 12 }}>
           * Pledge will execute via MongoDB atomic operations. Minimum pledge required is ₹{(selectedStartup?.minimumInvestment || 10000).toLocaleString()}.
         </Text>
+      </Modal>
+
+      {/* Checkout Basket Investment Modal */}
+      <Modal
+        title={<span style={{ color: tc, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}>Confirm Basket Investment</span>}
+        open={basketModalVisible}
+        onOk={handleConfirmBasketInvestment}
+        onCancel={() => setBasketModalVisible(false)}
+        confirmLoading={submittingBasketInvest}
+        okText="Confirm Investment"
+        okButtonProps={{
+          style: {
+            backgroundColor: '#00d09c',
+            borderColor: '#00d09c',
+            color: '#fff',
+            borderRadius: 8,
+            height: 38,
+            fontWeight: 700
+          }
+        }}
+        cancelButtonProps={{
+          style: {
+            background: bgBtnCancel,
+            color: tc,
+            border: isDarkMode ? '1px solid #374151' : 'none',
+            borderRadius: 8,
+            height: 38
+          }
+        }}
+        style={{ borderRadius: 16 }}
+        styles={{ body: { padding: '16px 0' } }}
+        wrapClassName="invest-modal-wrap"
+      >
+        <div style={{ background: bgInner, padding: 20, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', marginBottom: 20 }}>
+          {selectedBasket && (
+            <>
+              <Statistic 
+                title={<span style={{ color: '#7c8099', fontSize: 12 }}>MUTUAL FUND BASKET</span>} 
+                value={selectedBasket.name} 
+                valueStyle={{ color: tc, fontSize: 20, fontFamily: 'Outfit', fontWeight: 800 }}
+              />
+              <Paragraph style={{ color: '#7c8099', marginTop: 12, marginBottom: 0 }}>
+                Includes {selectedBasket.constituents.length} startups with instant diversification.
+              </Paragraph>
+            </>
+          )}
+        </div>
+
+        <Text style={{ color: tc, display: 'block', marginBottom: 8, fontWeight: 600 }}>Capital Allocation (Min ₹5,000)</Text>
+        {currentUser && basketInvestAmount > currentUser.walletBalance && (
+          <Alert 
+            message={`Insufficient wallet balance (Your balance: ₹${currentUser.walletBalance.toLocaleString()})`} 
+            type="error" 
+            showIcon 
+            style={{ marginBottom: 12 }} 
+          />
+        )}
+        <InputNumber
+          min={5000}
+          value={basketInvestAmount}
+          onChange={setBasketInvestAmount}
+          onPressEnter={handleConfirmBasketInvestment}
+          formatter={value => `₹ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+          parser={value => value.replace(/\₹\s?|(,*)/g, '')}
+          style={{ width: '100%', height: 42, background: isDarkMode ? '#121620' : '#ffffff', color: tc, border: isDarkMode ? '1px solid #1f2937' : '1px solid #d1d5db', borderRadius: 8, fontSize: 16 }}
+        />
+
+        {selectedBasket && basketInvestAmount >= 5000 && (
+          <div style={{ marginTop: 24, borderTop: `1px solid ${borderCl}`, paddingTop: 20 }}>
+            <Text style={{ color: tc, fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 12 }}>
+              📊 Proportional Capital Distribution
+            </Text>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {selectedBasket.constituents.map((item, idx) => {
+                const allocated = Math.round(basketInvestAmount * (item.weight / 100));
+                return (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isDarkMode ? '#111827' : '#f8fafc', padding: '8px 12px', borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <Avatar size="small" src={item.logoUrl} style={{ backgroundColor: '#00d09c' }}>{item.name[0]}</Avatar>
+                      <Text style={{ fontWeight: 600, color: tc }}>{item.name}</Text>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{allocated.toLocaleString()}</Text>
+                      <br />
+                      <Text type="secondary" style={{ fontSize: 10 }}>{item.weight}% weight</Text>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* ── Wallet Modal (Deposit & Withdrawal Gateways) ── */}

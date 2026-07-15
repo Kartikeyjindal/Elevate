@@ -579,6 +579,202 @@ router.get('/wallet/transactions', verifyToken, async (req, res) => {
   }
 });
 
+// Pre-defined Startup Baskets
+const PREDEFINED_BASKETS = [
+  {
+    id: 'ai-deeptech',
+    name: 'AI & DeepTech Basket',
+    tagline: 'Invest in the frontier of artificial intelligence, quantum computing, and advanced robotics.',
+    description: 'A curated selection of high-growth ventures building foundation models, edge AI, and next-generation deep tech infrastructure.',
+    icon: 'RobotOutlined',
+    constituents: [
+      { name: 'Trade Algo', weight: 30 },
+      { name: 'SapientX', weight: 25 },
+      { name: 'Delhi Quantum Grid', weight: 25 },
+      { name: 'PSYONIC', weight: 20 }
+    ]
+  },
+  {
+    id: 'd2c-consumer',
+    name: 'D2C & Consumer Brands Basket',
+    tagline: 'Capitalize on shifting consumer habits and rapidly scaling plant-based, EV, and beverage brands.',
+    description: 'High-margin consumer goods, food & beverage, and lifestyle brands showing strong early-market product-market fit.',
+    icon: 'ShoppingOutlined',
+    constituents: [
+      { name: 'Honeybee Burger', weight: 30 },
+      { name: 'Fire Department Coffee', weight: 30 },
+      { name: 'Cheers Health', weight: 20 },
+      { name: 'The Sports Bra Cafe', weight: 20 }
+    ]
+  },
+  {
+    id: 'fintech-creator',
+    name: 'Fintech & Insurtech Giants Basket',
+    tagline: 'Fuel the digital finance revolution with creators, automated underwriting, and micro-leasing SaaS.',
+    description: 'Leading platforms digitizing real estate, creator payments, and traditional auto insurance markets.',
+    icon: 'TransactionOutlined',
+    constituents: [
+      { name: 'Trade Algo', weight: 30 },
+      { name: 'Happiness Insurance', weight: 30 },
+      { name: 'Rentberry India', weight: 20 },
+      { name: 'Gumroad Creator Hub', weight: 20 }
+    ]
+  },
+  {
+    id: 'green-mobility',
+    name: 'Green Tech & Clean Energy Basket',
+    tagline: 'Accelerate the global transition to renewable grid solutions and zero-emission vehicles.',
+    description: 'Focused on sustainable agriculture robotics, urban micro-EV transit, solar battery cells, and wind turbines.',
+    icon: 'EcoOutlined',
+    constituents: [
+      { name: 'Eli Electric Vehicles', weight: 30 },
+      { name: 'Doroni Aerospace', weight: 30 },
+      { name: 'Greenfield Robotics', weight: 20 },
+      { name: 'GoSun', weight: 20 }
+    ]
+  }
+];
+
+// GET All Startup Baskets
+router.get('/baskets', verifyToken, async (req, res) => {
+  try {
+    const Startup = require('../models/startup');
+    const allStartups = await Startup.find({ status: 'approved' });
+    
+    // Map constituents to actual startup objects from DB
+    const populatedBaskets = PREDEFINED_BASKETS.map(basket => {
+      const activeConstituents = [];
+      basket.constituents.forEach(item => {
+        const match = allStartups.find(s => s.name.toLowerCase() === item.name.toLowerCase());
+        if (match) {
+          activeConstituents.push({
+            startupId: match._id,
+            name: match.name,
+            tagline: match.tagline,
+            logoUrl: match.logoUrl,
+            valuationCap: match.valuationCap,
+            pricePerShare: match.pricePerShare,
+            weight: item.weight
+          });
+        }
+      });
+      return {
+        ...basket,
+        constituents: activeConstituents
+      };
+    }).filter(b => b.constituents.length > 0);
+    
+    res.status(200).json(populatedBaskets);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST Invest in a Basket
+router.post('/baskets/invest', verifyToken, async (req, res) => {
+  const { basketId, totalAmount } = req.body;
+  const userId = req.user.id;
+  
+  if (!basketId || !totalAmount || totalAmount < 5000) {
+    return res.status(400).json({ error: 'Invalid investment amount. Minimum investment is ₹5,000 for a basket.' });
+  }
+  
+  const User = require('../models/user');
+  const Startup = require('../models/startup');
+  const Investment = require('../models/investment');
+  const WalletTransaction = require('../models/walletTransaction');
+  
+  const basket = PREDEFINED_BASKETS.find(b => b.id === basketId);
+  if (!basket) {
+    return res.status(404).json({ error: 'Basket not found' });
+  }
+  
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (user.walletBalance < totalAmount) {
+      return res.status(400).json({ error: 'Insufficient wallet balance' });
+    }
+    
+    const allStartups = await Startup.find({ status: 'approved' });
+    const constituentsToInvest = [];
+    let totalWeight = 0;
+    
+    basket.constituents.forEach(item => {
+      const match = allStartups.find(s => s.name.toLowerCase() === item.name.toLowerCase());
+      if (match) {
+        const constituentsToInvest.push({
+          startup: match,
+          weight: item.weight
+        });
+        totalWeight += item.weight;
+      }
+    });
+    
+    if (constituentsToInvest.length === 0) {
+      return res.status(400).json({ error: 'No active constituents found in this basket for investment' });
+    }
+    
+    const investmentsCreated = [];
+    let spentAmount = 0;
+    
+    for (let i = 0; i < constituentsToInvest.length; i++) {
+      const { startup, weight } = constituentsToInvest[i];
+      const isLast = i === constituentsToInvest.length - 1;
+      const startupAmount = isLast 
+        ? (totalAmount - spentAmount) 
+        : Math.round(totalAmount * (weight / totalWeight));
+      
+      spentAmount += startupAmount;
+      
+      if (startupAmount > 0) {
+        const investment = new Investment({
+          userId: user._id,
+          startupId: startup._id,
+          amount: startupAmount,
+          timestamp: new Date()
+        });
+        await investment.save();
+        
+        startup.raisedAmount = (startup.raisedAmount || 0) + startupAmount;
+        startup.totalInvestors = (startup.totalInvestors || 0) + 1;
+        await startup.save();
+        
+        investmentsCreated.push({
+          startupName: startup.name,
+          amount: startupAmount,
+          investmentId: investment._id
+        });
+      }
+    }
+    
+    user.walletBalance -= totalAmount;
+    await user.save();
+    
+    const walletTx = new WalletTransaction({
+      userId: user._id,
+      amount: totalAmount,
+      type: 'debit',
+      description: `Invested in ${basket.name}`,
+      timestamp: new Date()
+    });
+    await walletTx.save();
+    
+    res.status(200).json({
+      message: `Successfully invested ₹${totalAmount.toLocaleString()} in ${basket.name}`,
+      walletBalance: user.walletBalance,
+      investments: investmentsCreated
+    });
+    
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
 
 
