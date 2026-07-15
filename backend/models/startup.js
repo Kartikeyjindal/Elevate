@@ -50,7 +50,14 @@ const startupSchema = new mongoose.Schema({
   exitStrategy: { type: String, default: '' },
 
   // Application completeness tracking
-  applicationComplete: { type: Boolean, default: false }
+  applicationComplete: { type: Boolean, default: false },
+
+  // Milestone stage tracking
+  milestoneStage: {
+    type: String,
+    enum: ['idea', 'mvp', 'revenue', 'growth', 'scale'],
+    default: 'mvp'
+  }
 }, {
   timestamps: true
 });

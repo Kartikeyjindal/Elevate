@@ -821,6 +821,99 @@ async function seedDatabase() {
     }
 
     console.log('Seeding completed successfully.');
+
+    // 6. Seed milestoneStage for startups that don't have one
+    const startupsMissingStage = await Startup.find({ milestoneStage: { $exists: false } });
+    const stageMap = {
+      'Idea': 'idea', 'MVP': 'mvp', 'Early Revenue': 'revenue', 'Growth': 'growth', 'Scale': 'scale'
+    };
+    // Assign realistic stages to well-known startups
+    const specificStages = {
+      'Happiness Insurance': 'growth',
+      'Trade Algo': 'growth',
+      'SapientX': 'mvp',
+      'Delhi Quantum Grid': 'mvp',
+      'Knightscope': 'scale',
+      'BOXABL': 'growth',
+      'Greenfield Robotics': 'revenue',
+      'Eli Electric Vehicles': 'revenue',
+      'GoSun': 'growth',
+      'Doroni Aerospace': 'mvp',
+      'Rentberry India': 'scale',
+      'Gumroad Creator Hub': 'scale',
+      'Cheers Health': 'revenue',
+      'Honeybee Burger': 'growth',
+      'Fire Department Coffee': 'growth',
+      'The Sports Bra Cafe': 'revenue',
+      'PSYONIC': 'growth',
+    };
+    const allStartupsForStage = await Startup.find({ status: 'approved' });
+    let stagesUpdated = 0;
+    for (const s of allStartupsForStage) {
+      if (!s.milestoneStage || s.milestoneStage === 'mvp') {
+        const specificStage = specificStages[s.name];
+        const derivedStage = stageMap[s.stage] || 'mvp';
+        const newStage = specificStage || derivedStage;
+        if (newStage !== s.milestoneStage) {
+          s.milestoneStage = newStage;
+          await s.save();
+          stagesUpdated++;
+        }
+      }
+    }
+    if (stagesUpdated > 0) {
+      console.log(`Updated milestoneStage for ${stagesUpdated} startups.`);
+    }
+
+    // 7. Seed sample Founder Updates & Q&As for popular startups
+    const StartupUpdate = require('./models/startupUpdate');
+    const updatesCount = await StartupUpdate.countDocuments();
+    if (updatesCount === 0) {
+      const updateTargets = await Startup.find({ name: { $in: ['Happiness Insurance', 'Trade Algo', 'Knightscope', 'BOXABL', 'Greenfield Robotics'] } });
+      const sampleUpdates = {
+        'Happiness Insurance': [
+          { type: 'update', authorName: 'Priya Mehta (Founder)', content: '🚀 Milestone Update: We just crossed ₹12 Crore in annual recurring revenue! Our claim settlement AI now processes 94% of claims in under 2 minutes. Expanding to Tier-2 cities in Q3.', daysAgo: 3 },
+          { type: 'update', authorName: 'Priya Mehta (Founder)', content: '💼 Team Update: We\'ve onboarded our new CTO, Vikram Anand (ex-Razorpay), who will lead our AI/ML stack expansion. Exciting times ahead!', daysAgo: 14 },
+          { type: 'question', authorName: 'Rohan K.', answer: 'Great question! We are currently IRDAI-registered and working on our Category D license expansion. Full licensing expected by September 2026.', content: 'What is the current regulatory status of your insurance licenses?', daysAgo: 7 },
+        ],
+        'Trade Algo': [
+          { type: 'update', authorName: 'Rajiv Sharma (CEO)', content: '📈 Platform Update: Trade Algo now manages ₹450 Crore in AUM across 18,000 active algo trading accounts. Our Sharpe ratio of 2.4 continues to outperform benchmark indices.', daysAgo: 5 },
+          { type: 'question', authorName: 'Ananya M.', answer: 'Absolutely. We are SEBI-registered as a research analyst. All strategies are backtested over 5+ years of market data before going live.', content: 'Is this platform SEBI-compliant for retail algo trading?', daysAgo: 10 },
+        ],
+        'Knightscope': [
+          { type: 'update', authorName: 'William Santana Li (CEO)', content: '🤖 Product Launch: KS-8R (our new indoor patrol bot) just shipped to 12 hospital networks across India. With 99.6% uptime, we\'re setting the standard for autonomous security.', daysAgo: 2 },
+          { type: 'update', authorName: 'William Santana Li (CEO)', content: '🏆 Award: Knightscope was named "Most Innovative Security Tech" at the India Smart Infrastructure Summit 2026. Proud of the team!', daysAgo: 20 },
+        ],
+        'BOXABL': [
+          { type: 'update', authorName: 'Paolo Tiramani (Founder)', content: '🏠 Production Update: Our Las Vegas factory is now producing 20 Casitas per day. We have a 40,000-unit waitlist and are in discussions with the Indian government for affordable housing pilot projects.', daysAgo: 6 },
+          { type: 'question', authorName: 'Deepak S.', answer: 'Yes! We are in active talks with NHIDCL for pilot programs in Northeast India. The Casita\'s modular design is perfect for rapid deployment in remote areas.', content: 'Any plans to bring BOXABL to India directly?', daysAgo: 12 },
+        ],
+        'Greenfield Robotics': [
+          { type: 'update', authorName: 'Clint Mickle (CEO)', content: '🌾 Field Update: Our autonomous weeding robots completed their first full cotton season trial in Punjab. Results: 60% reduction in herbicide use and ₹8,000/acre cost savings for farmers.', daysAgo: 8 },
+        ],
+      };
+
+      for (const [name, updates] of Object.entries(sampleUpdates)) {
+        const startup = updateTargets.find(s => s.name === name);
+        if (!startup) continue;
+        for (const u of updates) {
+          const su = new StartupUpdate({
+            startupId: startup._id,
+            type: u.type,
+            authorName: u.authorName,
+            authorRole: u.type === 'question' ? 'investor' : 'founder',
+            content: u.content,
+            answer: u.answer || '',
+            createdAt: new Date(Date.now() - u.daysAgo * 24 * 60 * 60 * 1000)
+          });
+          await su.save();
+        }
+      }
+      console.log('Seeded founder updates and Q&As for 5 startups.');
+    } else {
+      console.log(`Startup updates already exist (${updatesCount}). Skipping.`);
+    }
+
     if (require.main === module) {
       process.exit(0);
     }

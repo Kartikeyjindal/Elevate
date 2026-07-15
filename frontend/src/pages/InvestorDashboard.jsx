@@ -248,6 +248,21 @@ export default function InvestorDashboard() {
   const [basketPaymentType, setBasketPaymentType] = useState('onetime'); // 'onetime' | 'sip'
   const [sipDuration, setSipDuration] = useState(12); // months
 
+  // Feature 3: Watchlist
+  const [watchlist, setWatchlist] = useState([]); // array of startup IDs
+  const [togglingWatchlist, setTogglingWatchlist] = useState(new Set());
+  const [marketplaceSubTab, setMarketplaceSubTab] = useState('all'); // 'all' | 'watchlist'
+
+  // Feature 5: Investment Timeline
+  const [timelineFilter, setTimelineFilter] = useState('all'); // 'all' | 'investments' | 'deposits' | 'withdrawals'
+
+  // Feature 10: Founder Q&A / Updates
+  const [companyUpdates, setCompanyUpdates] = useState([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [companyModalTab, setCompanyModalTab] = useState('overview'); // 'overview' | 'updates'
+  const [questionText, setQuestionText] = useState('');
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+
   // States for Dynamic Valuation Sliders & Live Activity Feed
   const [projectionGrowth, setProjectionGrowth] = useState(25);
   const [projectionRetention, setProjectionRetention] = useState(85);
@@ -874,6 +889,19 @@ export default function InvestorDashboard() {
         // Silently fail - transactions just won't show
       }
       setLoadingTransactions(false);
+
+      // Fetch watchlist
+      try {
+        const wlRes = await fetch(`${API_URL}/api/watchlist`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (wlRes.ok) {
+          const wlData = await wlRes.json();
+          setWatchlist(wlData.map(s => s._id || s));
+        }
+      } catch (err) {
+        console.error('Failed to load watchlist:', err);
+      }
     } catch (err) {
       message.error('Failed to load dashboard data');
     }
@@ -996,6 +1024,27 @@ export default function InvestorDashboard() {
     ]
   };
 
+  // Feature 3: Toggle watchlist
+  const handleToggleWatchlist = async (startupId) => {
+    const token = localStorage.getItem('token');
+    setTogglingWatchlist(prev => new Set([...prev, startupId]));
+    try {
+      const res = await fetch(`${API_URL}/api/watchlist/${startupId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWatchlist(data.watchlist);
+        message.success(data.action === 'added' ? '🔖 Added to Watchlist' : '✓ Removed from Watchlist', 2);
+      }
+    } catch (err) {
+      message.error('Failed to update watchlist');
+    } finally {
+      setTogglingWatchlist(prev => { const s = new Set(prev); s.delete(startupId); return s; });
+    }
+  };
+
   const handleOpenCompanyDetails = async (startup, holdingTransactions = []) => {
     setCompanyDetailsVisible(true);
     setCompanyDetailsLoading(true);
@@ -1003,22 +1052,80 @@ export default function InvestorDashboard() {
     setCurrentCompanyHoldings(holdingTransactions);
     setProjectionGrowth(25);
     setProjectionRetention(85);
+    setCompanyModalTab('overview');
+    setCompanyUpdates([]);
+    setQuestionText('');
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`${API_URL}/api/startups/${startup._id}/details`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [detailsRes, updatesRes] = await Promise.all([
+        fetch(`${API_URL}/api/startups/${startup._id}/details`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`${API_URL}/api/startups/${startup._id}/updates`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
+      if (detailsRes.ok) {
+        const data = await detailsRes.json();
         setCompanyDetailsData(data);
       } else {
         message.error('Failed to load company details.');
+      }
+      if (updatesRes.ok) {
+        const updatesData = await updatesRes.json();
+        setCompanyUpdates(updatesData);
       }
     } catch (err) {
       console.error(err);
       message.error('Error fetching company details.');
     } finally {
       setCompanyDetailsLoading(false);
+    }
+  };
+
+  // Feature 7: Helper to get index for Milestone step
+  const getMilestoneStepIndex = (milestoneStage) => {
+    const mapping = {
+      'idea': 0,
+      'mvp': 1,
+      'revenue': 2,
+      'growth': 3,
+      'scale': 4
+    };
+    return mapping[milestoneStage?.toLowerCase()] ?? 1; // Default to MVP
+  };
+
+  // Feature 10: Post question in Updates & Q&A
+  const handlePostQuestion = async () => {
+    if (!questionText || questionText.trim().length < 5) {
+      message.error("Question must be at least 5 characters long.");
+      return;
+    }
+    setSubmittingQuestion(true);
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`${API_URL}/api/startups/${companyDetailsData?.startup?._id}/questions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content: questionText.trim() })
+      });
+      if (res.ok) {
+        const newQuestion = await res.json();
+        setCompanyUpdates(prev => [newQuestion, ...prev]);
+        setQuestionText('');
+        message.success('Question posted successfully!');
+      } else {
+        const errorData = await res.json();
+        message.error(errorData.error || 'Failed to post question.');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('An error occurred while posting your question.');
+    } finally {
+      setSubmittingQuestion(false);
     }
   };
 
@@ -1270,15 +1377,21 @@ export default function InvestorDashboard() {
     setExpandedStartupId(expandedStartupId === id ? null : id);
   };
 
-  // Filter startups based on search query
+  // Filter startups based on search query and watchlist tab selection
   const filteredStartups = startups.filter(startup => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch = (
       startup.name.toLowerCase().includes(query) ||
       startup.category.toLowerCase().includes(query) ||
       startup.marketingMixVariables.toLowerCase().includes(query) ||
       (startup.tagline && startup.tagline.toLowerCase().includes(query))
     );
+    if (!matchesSearch) return false;
+
+    if (marketplaceSubTab === 'watchlist') {
+      return watchlist.includes(startup._id);
+    }
+    return true;
   });
 
   const portfolioColumns = [
@@ -1580,6 +1693,49 @@ export default function InvestorDashboard() {
     if (svgPoints.length === 0) return '';
     return `M 10 90 L ${svgPoints.map(p => `${p.x} ${p.y}`).join(" L ")} L 290 90 Z`;
   }, [svgPoints]);
+
+  // Feature 5: Merged chronological timeline events
+  const timelineEvents = React.useMemo(() => {
+    const events = [];
+
+    // 1. Process investments
+    if (Array.isArray(myInvestments)) {
+      // We will loop through the original myInvestments array to show actual raw transaction events
+      myInvestments.forEach(inv => {
+        const isSip = inv.note && inv.note.includes('SIP');
+        events.push({
+          id: `inv-${inv._id || Math.random()}`,
+          type: isSip ? 'sip' : 'investment',
+          title: isSip ? `SIP Instalment` : `Direct Investment`,
+          startupName: inv.startupId?.name || inv.startupName || 'Venture',
+          amount: inv.amount,
+          date: new Date(inv.timestamp || inv.createdAt),
+          description: isSip ? inv.note : `Pledged capital to ${inv.startupId?.name || inv.startupName || 'Venture'}`
+        });
+      });
+    }
+
+    // 2. Process wallet transactions
+    if (Array.isArray(walletTransactions)) {
+      walletTransactions.forEach(tx => {
+        // Skip investment type transactions since we already processed them directly from myInvestments to avoid duplicate display
+        if (tx.type === 'investment') return;
+        
+        events.push({
+          id: `tx-${tx._id || Math.random()}`,
+          type: tx.type, // 'deposit' or 'withdraw'
+          title: tx.type === 'deposit' ? 'Wallet Deposit' : 'Wallet Withdrawal',
+          startupName: null,
+          amount: tx.amount,
+          date: new Date(tx.timestamp || tx.createdAt),
+          description: tx.description || (tx.type === 'deposit' ? 'Funds added to account' : 'Funds withdrawn from account')
+        });
+      });
+    }
+
+    // Sort descending by date
+    return events.sort((a, b) => b.date - a.date);
+  }, [myInvestments, walletTransactions]);
 
   // Group investments by company to combine duplicates
   const groupedHoldings = React.useMemo(() => {
@@ -1929,6 +2085,30 @@ export default function InvestorDashboard() {
                     </div>
                   )}
 
+                  {/* Watchlist Sub-Tab Toggle */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Radio.Group 
+                        value={marketplaceSubTab} 
+                        onChange={(e) => setMarketplaceSubTab(e.target.value)}
+                        buttonStyle="solid"
+                        size="middle"
+                      >
+                        <Radio.Button value="all" style={{ fontWeight: 600 }}>
+                          🌐 All Deals
+                        </Radio.Button>
+                        <Radio.Button value="watchlist" style={{ fontWeight: 600 }}>
+                          ⭐ My Watchlist ({watchlist.length})
+                        </Radio.Button>
+                      </Radio.Group>
+                    </div>
+                    {marketplaceSubTab === 'watchlist' && watchlist.length > 0 && (
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Showing {filteredStartups.length} watchlisted venture{filteredStartups.length === 1 ? '' : 's'}.
+                      </Text>
+                    )}
+                  </div>
+
                   {/* Startup Marketplace Grid */}
                   <Row gutter={[20, 20]}>
                     {filteredStartups.length === 0 ? (
@@ -1997,7 +2177,7 @@ export default function InvestorDashboard() {
                             >
                               <div style={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
                                 <div>
-                                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12, gap: 10 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 10, width: '100%' }}>
                                     <Title 
                                       level={4} 
                                       style={{ 
@@ -2006,12 +2186,23 @@ export default function InvestorDashboard() {
                                         fontFamily: 'Outfit', 
                                         fontWeight: 800, 
                                         fontSize: 18,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        flex: 1
                                       }}
                                       onClick={() => handleOpenCompanyDetails(startup)}
                                     >
                                       {startup.name}
                                     </Title>
+                                    <Button
+                                      type="text"
+                                      icon={watchlist.includes(startup._id) ? <BookOutlined style={{ color: '#00d09c', fontSize: 18 }} /> : <BookOutlined style={{ color: '#7c8099', fontSize: 18 }} />}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleWatchlist(startup._id);
+                                      }}
+                                      loading={togglingWatchlist.has(startup._id)}
+                                      style={{ padding: 4, height: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                    />
                                   </div>
                                   
                                   <Paragraph ellipsis={{ rows: 2 }} style={{ color: isDarkMode ? '#9ca3af' : '#64748b', fontSize: 13, minHeight: 40, marginBottom: 16 }}>
@@ -2040,6 +2231,37 @@ export default function InvestorDashboard() {
                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
                                       <Text type="secondary" style={{ fontSize: 11 }}>{startup.totalInvestors?.toLocaleString() || 0} investors</Text>
                                       <Text type="secondary" style={{ fontSize: 11 }}>Target: ₹{targetFunding.toLocaleString()}</Text>
+                                    </div>
+                                  </div>
+
+                                  {/* Milestone Stepper */}
+                                  <div style={{ marginBottom: 16 }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                      <Text type="secondary" style={{ fontSize: 10, textTransform: 'uppercase' }}>
+                                        Stage
+                                      </Text>
+                                      <Text style={{ color: '#00d09c', fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>
+                                        {startup.milestoneStage || 'MVP'}
+                                      </Text>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                      {['idea', 'mvp', 'revenue', 'growth', 'scale'].map((step, sIdx) => {
+                                        const currentIdx = getMilestoneStepIndex(startup.milestoneStage);
+                                        const isActive = sIdx <= currentIdx;
+                                        return (
+                                          <div 
+                                            key={step} 
+                                            style={{ 
+                                              flex: 1, 
+                                              height: 4, 
+                                              borderRadius: 2, 
+                                              background: isActive ? '#00d09c' : (isDarkMode ? '#374151' : '#e2e8f0'),
+                                              transition: 'background 0.3s' 
+                                            }} 
+                                            title={step.toUpperCase()}
+                                          />
+                                        );
+                                      })}
                                     </div>
                                   </div>
 
@@ -2401,7 +2623,7 @@ export default function InvestorDashboard() {
                     </Col>
                   </Row>
 
-                  <Card>
+                  <Card style={{ background: bgInner, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
                     <Title level={4} style={{ color: isDarkMode ? '#f1f5f9' : '#44475b', marginBottom: 20, fontFamily: 'Outfit', fontWeight: 700 }}>Investment Ledger &amp; Valuation History</Title>
                     <Table 
                       dataSource={groupedHoldings} 
@@ -2413,6 +2635,150 @@ export default function InvestorDashboard() {
                       scroll={{ x: true }}
                     />
                   </Card>
+
+                  {/* Feature 5: Chronological Activity Timeline */}
+                  {(() => {
+                    const filteredEvents = timelineEvents.filter(evt => {
+                      if (timelineFilter === 'all') return true;
+                      if (timelineFilter === 'investments') return evt.type === 'investment' || evt.type === 'sip';
+                      if (timelineFilter === 'deposits') return evt.type === 'deposit';
+                      if (timelineFilter === 'withdrawals') return evt.type === 'withdraw';
+                      if (timelineFilter === 'sip') return evt.type === 'sip';
+                      return true;
+                    });
+
+                    return (
+                      <Card style={{ marginTop: 24, background: bgInner, border: `1px solid ${borderCl}`, borderRadius: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
+                          <div>
+                            <Title level={4} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 16 }}>
+                              📜 Chronological Activity Timeline
+                            </Title>
+                            <Paragraph type="secondary" style={{ fontSize: 12, margin: 0, marginTop: 4 }}>
+                              Track all deposits, investments, SIPs, and exits in real-time.
+                            </Paragraph>
+                          </div>
+
+                          {/* Filter Chips */}
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            {[
+                              { label: 'All', value: 'all' },
+                              { label: 'Investments', value: 'investments' },
+                              { label: 'Deposits', value: 'deposits' },
+                              { label: 'SIPs', value: 'sip' },
+                              { label: 'Withdrawals', value: 'withdrawals' }
+                            ].map(chip => (
+                              <Tag
+                                key={chip.value}
+                                color={timelineFilter === chip.value ? 'green' : 'default'}
+                                onClick={() => setTimelineFilter(chip.value)}
+                                style={{ 
+                                  cursor: 'pointer', 
+                                  padding: '4px 12px', 
+                                  borderRadius: 20, 
+                                  fontWeight: 600,
+                                  fontSize: 12,
+                                  border: timelineFilter === chip.value ? '1px solid #00d09c' : `1px solid ${borderCl}`,
+                                  background: timelineFilter === chip.value ? 'rgba(0, 208, 156, 0.1)' : 'transparent',
+                                  color: timelineFilter === chip.value ? '#00d09c' : tc
+                                }}
+                              >
+                                {chip.label}
+                              </Tag>
+                            ))}
+                          </div>
+                        </div>
+
+                        {filteredEvents.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '36px 0', color: '#7c8099' }}>
+                            No activity events match the selected filter.
+                          </div>
+                        ) : (
+                          <div style={{ position: 'relative', paddingLeft: 24, borderLeft: `2px solid ${borderCl}`, marginLeft: 12, display: 'flex', flexDirection: 'column', gap: 24, marginTop: 12 }}>
+                            {filteredEvents.map((evt) => {
+                              let color = '#00d09c';
+                              let icon = '💼';
+                              if (evt.type === 'deposit') {
+                                color = '#3b82f6';
+                                icon = '💰';
+                              } else if (evt.type === 'withdraw') {
+                                color = '#f59e0b';
+                                icon = '📤';
+                              } else if (evt.type === 'sip') {
+                                color = '#8b5cf6';
+                                icon = '🛒';
+                              }
+
+                              return (
+                                <div key={evt.id} style={{ position: 'relative' }}>
+                                  {/* Timeline Point */}
+                                  <div style={{ 
+                                    position: 'absolute', 
+                                    left: -36, 
+                                    top: 2, 
+                                    width: 24, 
+                                    height: 24, 
+                                    borderRadius: '50%', 
+                                    background: isDarkMode ? '#1e293b' : '#ffffff', 
+                                    border: `2px solid ${color}`, 
+                                    display: 'flex', 
+                                    alignItems: 'center', 
+                                    justifyContent: 'center',
+                                    fontSize: 12,
+                                    zIndex: 1
+                                  }}>
+                                    {icon}
+                                  </div>
+
+                                  {/* Content */}
+                                  <div style={{ 
+                                    background: bgCard, 
+                                    padding: '14px 18px', 
+                                    borderRadius: 10, 
+                                    border: `1px solid ${borderCl}`,
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    flexWrap: 'wrap',
+                                    gap: 12
+                                  }}>
+                                    <div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                        <Text style={{ fontWeight: 800, color: tc, fontSize: 14 }}>
+                                          {evt.title}
+                                        </Text>
+                                        {evt.startupName && (
+                                          <Tag color="cyan" style={{ fontWeight: 600, fontSize: 10, borderRadius: 4 }}>
+                                            {evt.startupName}
+                                          </Tag>
+                                        )}
+                                      </div>
+                                      <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>
+                                        {evt.description}
+                                      </Text>
+                                    </div>
+
+                                    <div style={{ textAlign: 'right' }}>
+                                      <Text style={{ 
+                                        fontSize: 16, 
+                                        fontWeight: 800, 
+                                        color: evt.type === 'withdraw' ? '#f59e0b' : (evt.type === 'deposit' ? '#3b82f6' : '#00d09c') 
+                                      }}>
+                                        {evt.type === 'withdraw' ? '-' : '+'} ₹{evt.amount.toLocaleString()}
+                                      </Text>
+                                      <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
+                                        {evt.date.toLocaleDateString()} · {evt.date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                      </Text>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </Card>
+                    );
+                  })()}
                 </div>
               )
             },
@@ -3579,6 +3945,37 @@ export default function InvestorDashboard() {
 
             return (
               <>
+                {/* Milestone Stepper */}
+                <div style={{ 
+                  margin: '0 16px 20px 16px', 
+                  background: isDarkMode ? '#1e293b' : '#f8fafc', 
+                  border: `1px solid ${borderCl}`, 
+                  borderRadius: 12, 
+                  padding: '16px 24px' 
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
+                    <span style={{ fontSize: 16 }}>🚀</span>
+                    <Text style={{ color: tc, fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Milestone Progress
+                    </Text>
+                  </div>
+                  <Steps 
+                    size="small" 
+                    current={getMilestoneStepIndex(s.milestoneStage)} 
+                    items={[
+                      { title: 'Idea', description: <span style={{ fontSize: 10 }}>Conception</span> },
+                      { title: 'MVP', description: <span style={{ fontSize: 10 }}>Product Demo</span> },
+                      { title: 'Revenue', description: <span style={{ fontSize: 10 }}>Market Fit</span> },
+                      { title: 'Growth', description: <span style={{ fontSize: 10 }}>Scale Up</span> },
+                      { title: 'Scale', description: <span style={{ fontSize: 10 }}>Expansion</span> }
+                    ]}
+                    style={{
+                      // Custom styles to ensure steps have consistent coloring
+                      fontFamily: 'Outfit'
+                    }}
+                  />
+                </div>
+
                 {/* ── Holdings & Pledges Section (At the top) ── */}
                 {currentCompanyHoldings && currentCompanyHoldings.length > 0 && (
                   <div style={{ 
@@ -3943,6 +4340,129 @@ export default function InvestorDashboard() {
                           rowKey={(record, index) => index}
                           locale={{ emptyText: 'No past backing history found.' }}
                         />
+                      </div>
+                    )
+                  },
+                  {
+                    key: '6',
+                    label: <span style={{ fontWeight: 600 }}>Updates & Q&A ({companyUpdates.length})</span>,
+                    children: (
+                      <div style={{ padding: '8px 0', maxHeight: 400, overflowY: 'auto' }}>
+                        {/* Ask a Question section */}
+                        <div style={{ marginBottom: 20, padding: 16, background: bgInner, borderRadius: 12, border: `1px solid ${borderCl}` }}>
+                          <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>
+                            🙋 Ask the Founder a Question
+                          </Text>
+                          <Input.TextArea 
+                            rows={3} 
+                            placeholder="Ask about their business model, future plans, financials, or technology..." 
+                            value={questionText} 
+                            onChange={(e) => setQuestionText(e.target.value)} 
+                            style={{ 
+                              background: isDarkMode ? '#121620' : '#ffffff', 
+                              color: tc, 
+                              border: isDarkMode ? '1px solid #1f2937' : '1px solid #d1d5db', 
+                              borderRadius: 8, 
+                              marginBottom: 10 
+                            }} 
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button 
+                              type="primary" 
+                              loading={submittingQuestion} 
+                              onClick={handlePostQuestion}
+                              style={{ 
+                                backgroundColor: '#00d09c', 
+                                borderColor: '#00d09c', 
+                                borderRadius: 8, 
+                                fontWeight: 700 
+                              }}
+                            >
+                              Submit Question
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Updates and Questions List */}
+                        <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
+                          📢 Live Updates & Q&A Feed
+                        </Text>
+
+                        {companyUpdates.length === 0 ? (
+                          <div style={{ textAlign: 'center', padding: '24px 0', color: '#7c8099' }}>
+                            No updates or Q&A threads yet for this company.
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                            {companyUpdates.map((item) => {
+                              const isUpdate = item.type === 'update';
+                              return (
+                                <div 
+                                  key={item._id} 
+                                  style={{ 
+                                    padding: 16, 
+                                    background: isUpdate ? (isDarkMode ? 'rgba(0, 208, 156, 0.05)' : 'rgba(0, 208, 156, 0.02)') : bgInner, 
+                                    borderRadius: 12, 
+                                    border: `1.5px solid ${isUpdate ? 'rgba(0, 208, 156, 0.2)' : borderCl}`
+                                  }}
+                                >
+                                  {/* Header */}
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <Avatar 
+                                        icon={<UserOutlined />} 
+                                        style={{ backgroundColor: isUpdate ? '#00d09c' : '#8b5cf6' }} 
+                                        size="small" 
+                                      />
+                                      <div>
+                                        <Text style={{ fontWeight: 700, color: tc, fontSize: 12 }}>
+                                          {item.authorName}
+                                        </Text>
+                                        <Tag color={isUpdate ? 'green' : 'purple'} style={{ fontSize: 9, fontWeight: 700, marginLeft: 6, borderRadius: 3 }}>
+                                          {isUpdate ? 'COMPANY UPDATE' : 'INVESTOR QUESTION'}
+                                        </Tag>
+                                      </div>
+                                    </div>
+                                    <Text style={{ fontSize: 10, color: '#7c8099' }}>
+                                      {new Date(item.createdAt).toLocaleDateString()}
+                                    </Text>
+                                  </div>
+
+                                  {/* Content */}
+                                  <Paragraph style={{ color: tc, fontSize: 12.5, margin: 0, whiteSpace: 'pre-line' }}>
+                                    {item.content}
+                                  </Paragraph>
+
+                                  {/* Answer (if question and answered) */}
+                                  {!isUpdate && item.answer && (
+                                    <div style={{ 
+                                      marginTop: 12, 
+                                      paddingLeft: 12, 
+                                      borderLeft: '3px solid #00d09c', 
+                                      background: isDarkMode ? '#1e293b' : '#f8fafc',
+                                      padding: '8px 12px',
+                                      borderRadius: '0 8px 8px 0'
+                                    }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                        <Avatar icon={<UserOutlined />} style={{ backgroundColor: '#00d09c' }} size="small" />
+                                        <Text style={{ fontWeight: 700, color: tc, fontSize: 11 }}>Founder Response</Text>
+                                      </div>
+                                      <Paragraph style={{ color: tc, fontSize: 12, margin: 0 }}>
+                                        {item.answer}
+                                      </Paragraph>
+                                    </div>
+                                  )}
+
+                                  {!isUpdate && !item.answer && (
+                                    <div style={{ marginTop: 8, fontSize: 11, color: '#7c8099', fontStyle: 'italic' }}>
+                                      ⏳ Awaiting founder response...
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )
                   }

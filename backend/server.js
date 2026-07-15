@@ -131,13 +131,17 @@ const initializeAndStart = async () => {
   const adminRoutes = require('./routes/admin');
   const investmentRoutes = require('./routes/investments');
   const blogRoutes = require('./routes/blogs');
+  const watchlistRoutes = require('./routes/watchlist');
+  const updatesRoutes = require('./routes/updates');
 
   // Routes registration
   app.use('/api/auth', authRoutes);
   app.use('/api/startups', startupRoutes);
+  app.use('/api/startups', updatesRoutes);
   app.use('/api/admin', adminRoutes);
   app.use('/api', investmentRoutes);
   app.use('/api/blogs', blogRoutes);
+  app.use('/api/watchlist', watchlistRoutes);
   console.log('API Routes successfully registered.');
 };
 

@@ -54,7 +54,11 @@ const userSchema = new mongoose.Schema({
   panCard: {
     type: String,
     default: ''
-  }
+  },
+  watchlist: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Startup'
+  }]
 }, {
   timestamps: true
 });
