@@ -2591,7 +2591,6 @@ export default function InvestorDashboard() {
                       scroll={{ x: true }}
                     />
                   </Card>
-                  })()}
                 </div>
               )
             },
