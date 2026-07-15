@@ -262,6 +262,14 @@ export default function InvestorDashboard() {
   const [questionText, setQuestionText] = useState('');
   const [submittingQuestion, setSubmittingQuestion] = useState(false);
 
+  // Feature 2: Health Score details expansion
+  const [showHealthDetails, setShowHealthDetails] = useState(false);
+
+  // Feature 6: Wealth Calculator state variables
+  const [calcPrincipal, setCalcPrincipal] = useState(50000);
+  const [calcDuration, setCalcDuration] = useState(5); // years
+  const [calcGrowthRate, setCalcGrowthRate] = useState(25); // expected CAGR%
+
   // States for Dynamic Valuation Sliders & Live Activity Feed
   const [projectionGrowth, setProjectionGrowth] = useState(25);
   const [projectionRetention, setProjectionRetention] = useState(85);
@@ -1693,6 +1701,106 @@ export default function InvestorDashboard() {
     return `M 10 90 L ${svgPoints.map(p => `${p.x} ${p.y}`).join(" L ")} L 290 90 Z`;
   }, [svgPoints]);
 
+  // Feature 2: Portfolio Health Score calculation
+  const portfolioHealthMetrics = React.useMemo(() => {
+    if (!myInvestments || myInvestments.length === 0) {
+      return {
+        score: 0,
+        rating: 'No Portfolio Data',
+        color: '#9ca3af',
+        emoji: '⚪',
+        breakdown: { diversification: 0, concentration: 0, sip: 0, roi: 0 },
+        tips: ['Make your first investment in a startup to start calculating your health score.']
+      };
+    }
+
+    let diversificationScore = 0;
+    let concentrationScore = 30;
+    let sipScore = 0;
+    let roiScore = 0;
+    const tips = [];
+
+    // 1. Diversification
+    const sectors = new Set(myInvestments.map(inv => inv.startupId?.category || inv.startupName));
+    diversificationScore = Math.min(30, sectors.size * 10);
+    if (sectors.size < 3) {
+      tips.push(`Diversification opportunity: You are invested in ${sectors.size} sector${sectors.size === 1 ? '' : 's'}. Spread your risk by investing in at least 3 distinct sectors.`);
+    }
+
+    // 2. Concentration Risk
+    const totalAmount = totalInvestedMyPortfolio || 1;
+    const amountsMap = {};
+    myInvestments.forEach(inv => {
+      const name = inv.startupId?.name || inv.startupName || 'Venture';
+      amountsMap[name] = (amountsMap[name] || 0) + inv.amount;
+    });
+
+    let highestConcentration = 0;
+    let highlyConcentratedStartup = '';
+    Object.entries(amountsMap).forEach(([name, amt]) => {
+      const pct = (amt / totalAmount) * 100;
+      if (pct > highestConcentration) {
+        highestConcentration = pct;
+        highlyConcentratedStartup = name;
+      }
+    });
+
+    if (highestConcentration > 40) {
+      const penalty = Math.min(30, Math.round((highestConcentration - 40) * 0.75));
+      concentrationScore = Math.max(0, 30 - penalty);
+      tips.push(`Concentration Risk: '${highlyConcentratedStartup}' makes up ${highestConcentration.toFixed(0)}% of your portfolio. Try spreading future investments across other startups to reduce exposure.`);
+    }
+
+    // 3. SIP Consistency
+    const hasSip = myInvestments.some(inv => inv.note && inv.note.includes('SIP'));
+    if (hasSip) {
+      sipScore = 20;
+    } else {
+      tips.push('SIP Advantage: Start a monthly SIP in one of our baskets to benefit from rupee-cost averaging and build long-term wealth.');
+    }
+
+    // 4. ROI Trend
+    const roiVal = trajectoryData.roi || 0;
+    if (roiVal >= 0) {
+      roiScore = 20;
+    } else {
+      tips.push('ROI Improvement: Some of your startups have had a valuation decrease. Review the updates tab for these companies to see their recovery progress.');
+    }
+
+    const totalScore = diversificationScore + concentrationScore + sipScore + roiScore;
+
+    let rating = 'Poor';
+    let color = '#ef4444'; // Red
+    let emoji = '🔴';
+    if (totalScore >= 80) {
+      rating = 'Excellent';
+      color = '#00d09c'; // Mint Green
+      emoji = '🟢';
+    } else if (totalScore >= 50) {
+      rating = 'Moderate';
+      color = '#fbbf24'; // Orange/Yellow
+      emoji = '🟡';
+    }
+
+    if (tips.length === 0) {
+      tips.push('Your portfolio is highly optimized! Keep exploring fresh deals in the marketplace to expand your footprint.');
+    }
+
+    return {
+      score: totalScore,
+      rating,
+      color,
+      emoji,
+      breakdown: {
+        diversification: diversificationScore,
+        concentration: concentrationScore,
+        sip: sipScore,
+        roi: roiScore
+      },
+      tips
+    };
+  }, [myInvestments, totalInvestedMyPortfolio, trajectoryData]);
+
   // Group investments by company to combine duplicates
   const groupedHoldings = React.useMemo(() => {
     if (!myInvestments || myInvestments.length === 0) return [];
@@ -2312,6 +2420,104 @@ export default function InvestorDashboard() {
               ),
               children: (
                 <div style={{ marginTop: 16 }}>
+                  {/* Feature 2: Portfolio Health Index Card */}
+                  {myInvestments.length > 0 && (
+                    <Card 
+                      style={{ 
+                        background: isDarkMode ? '#1e293b' : '#f8fafc', 
+                        border: `1.5px solid ${portfolioHealthMetrics.color}40`, 
+                        borderRadius: 16, 
+                        marginBottom: 20,
+                        boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
+                      }}
+                      bodyStyle={{ padding: '20px 24px' }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                          {/* Left: Progress Circle */}
+                          <div style={{ width: 68, height: 68, position: 'relative' }}>
+                            <Progress 
+                              type="circle" 
+                              percent={portfolioHealthMetrics.score} 
+                              strokeColor={portfolioHealthMetrics.color} 
+                              strokeWidth={8}
+                              width={68}
+                              format={(percent) => (
+                                <div style={{ fontSize: 16, fontWeight: 800, color: tc, fontFamily: 'Outfit' }}>
+                                  {percent}
+                                </div>
+                              )}
+                            />
+                          </div>
+
+                          {/* Middle: Details */}
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                              <span style={{ fontSize: 18 }}>{portfolioHealthMetrics.emoji}</span>
+                              <Title level={4} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 800, margin: 0, fontSize: 16 }}>
+                                Portfolio Health: <span style={{ color: portfolioHealthMetrics.color }}>{portfolioHealthMetrics.rating}</span>
+                              </Title>
+                            </div>
+                            <Text type="secondary" style={{ fontSize: 12 }}>
+                              Calculated based on Sector Diversification, Concentration limits, SIP commitments, and ROI trends.
+                            </Text>
+                          </div>
+                        </div>
+
+                        {/* Right: Expand optimization tips button */}
+                        <Button 
+                          type="dashed"
+                          onClick={() => setShowHealthDetails(!showHealthDetails)}
+                          style={{ 
+                            borderRadius: 8, 
+                            borderColor: portfolioHealthMetrics.color, 
+                            color: portfolioHealthMetrics.color,
+                            fontWeight: 700
+                          }}
+                        >
+                          {showHealthDetails ? 'Hide Diagnostics' : 'Optimize Portfolio ⚡'}
+                        </Button>
+                      </div>
+
+                      {/* Expandable Tips Panel */}
+                      {showHealthDetails && (
+                        <div style={{ 
+                          marginTop: 18, 
+                          paddingTop: 16, 
+                          borderTop: `1px solid ${borderCl}`,
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          gap: 12 
+                        }}>
+                          <Text style={{ fontWeight: 800, fontSize: 13, color: tc, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                            🔧 Tailored Optimization Tips
+                          </Text>
+                          {portfolioHealthMetrics.tips.map((tip, idx) => (
+                            <div 
+                              key={idx} 
+                              style={{ 
+                                display: 'flex', 
+                                gap: 10, 
+                                background: isDarkMode ? '#0f172a' : '#ffffff', 
+                                padding: '10px 14px', 
+                                borderRadius: 8, 
+                                borderLeft: `4px solid ${portfolioHealthMetrics.color}`,
+                                borderTop: `1px solid ${borderCl}`,
+                                borderRight: `1px solid ${borderCl}`,
+                                borderBottom: `1px solid ${borderCl}`
+                              }}
+                            >
+                              <span style={{ color: portfolioHealthMetrics.color, fontSize: 14 }}>💡</span>
+                              <Text style={{ color: tc, fontSize: 12.5, lineHeight: 1.5 }}>
+                                {tip}
+                              </Text>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </Card>
+                  )}
+
                   {/* Row 1: Capital Stats */}
                   <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
                     <Col xs={24} md={8}>
@@ -2590,6 +2796,255 @@ export default function InvestorDashboard() {
                       rowClassName={() => 'portfolio-row'}
                       scroll={{ x: true }}
                     />
+                  </Card>
+
+                  {/* Feature 6: Projected Wealth Calculator */}
+                  <Card 
+                    style={{ 
+                      marginTop: 24, 
+                      background: bgInner, 
+                      border: `1px solid ${borderCl}`, 
+                      borderRadius: 12 
+                    }}
+                  >
+                    <div style={{ marginBottom: 20 }}>
+                      <Title level={4} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 16 }}>
+                        🔮 Projected Wealth Simulator
+                      </Title>
+                      <Paragraph type="secondary" style={{ fontSize: 12, margin: 0, marginTop: 4 }}>
+                        Compare a One-Time lump-sum investment against a Monthly SIP option with the same total capital.
+                      </Paragraph>
+                    </div>
+
+                    {(() => {
+                      // Calculations
+                      const rate = calcGrowthRate / 100;
+                      // One-Time Future Value
+                      const oneTimeFV = Math.round(calcPrincipal * Math.pow(1 + rate, calcDuration));
+                      
+                      // Monthly SIP Future Value (distributing the same principal over calcDuration * 12 months)
+                      const totalMonths = calcDuration * 12;
+                      const monthlyPayment = calcPrincipal / totalMonths;
+                      const rMonthly = rate / 12;
+                      
+                      let sipFV = 0;
+                      if (rMonthly > 0) {
+                        sipFV = Math.round(monthlyPayment * ((Math.pow(1 + rMonthly, totalMonths) - 1) / rMonthly) * (1 + rMonthly));
+                      } else {
+                        sipFV = calcPrincipal; // 0% growth
+                      }
+
+                      const oneTimeGain = oneTimeFV - calcPrincipal;
+                      const sipGain = sipFV - calcPrincipal;
+                      
+                      const oneTimeMult = (oneTimeFV / calcPrincipal).toFixed(2);
+                      const sipMult = (sipFV / calcPrincipal).toFixed(2);
+
+                      // SVG Chart height scaling helper
+                      const maxVal = Math.max(oneTimeFV, sipFV, calcPrincipal * 2);
+                      const minVal = calcPrincipal;
+                      const range = maxVal - minVal || 1;
+
+                      // Generate points for the growth over time
+                      const oneTimePoints = [];
+                      const sipPoints = [];
+                      const stepsCount = 10;
+                      
+                      for (let i = 0; i <= stepsCount; i++) {
+                        const tYears = (calcDuration * i) / stepsCount;
+                        const tMonths = Math.round(totalMonths * i / stepsCount);
+                        
+                        // One-Time
+                        const otVal = calcPrincipal * Math.pow(1 + rate, tYears);
+                        
+                        // SIP
+                        let sVal = 0;
+                        if (rMonthly > 0) {
+                          sVal = (calcPrincipal / totalMonths) * ((Math.pow(1 + rMonthly, tMonths) - 1) / rMonthly) * (1 + rMonthly);
+                        } else {
+                          sVal = (calcPrincipal / totalMonths) * tMonths;
+                        }
+                        
+                        const x = 20 + (i / stepsCount) * 260;
+                        const yOt = 120 - ((otVal - minVal) / range) * 80;
+                        const ySip = 120 - ((sVal - minVal) / range) * 80;
+                        
+                        oneTimePoints.push(`${x},${yOt}`);
+                        sipPoints.push(`${x},${ySip}`);
+                      }
+
+                      return (
+                        <Row gutter={[24, 24]}>
+                          {/* Left Panel: Sliders */}
+                          <Col xs={24} md={12}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                                  <Text style={{ color: tc, fontWeight: 600 }}>Total Investment Capital</Text>
+                                  <Text style={{ color: '#00d09c', fontWeight: 800 }}>₹{calcPrincipal.toLocaleString()}</Text>
+                                </div>
+                                <Slider 
+                                  min={5000} 
+                                  max={1000000} 
+                                  step={5000}
+                                  value={calcPrincipal} 
+                                  onChange={(val) => setCalcPrincipal(val)} 
+                                  trackStyle={{ backgroundColor: '#00d09c' }}
+                                  handleStyle={{ borderColor: '#00d09c' }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7c8099' }}>
+                                  <span>₹5,000</span>
+                                  <span>₹10,00,000</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                                  <Text style={{ color: tc, fontWeight: 600 }}>Investment Horizon</Text>
+                                  <Text style={{ color: '#00d09c', fontWeight: 800 }}>{calcDuration} Year{calcDuration === 1 ? '' : 's'}</Text>
+                                </div>
+                                <Slider 
+                                  min={1} 
+                                  max={10} 
+                                  step={1}
+                                  value={calcDuration} 
+                                  onChange={(val) => setCalcDuration(val)} 
+                                  trackStyle={{ backgroundColor: '#00d09c' }}
+                                  handleStyle={{ borderColor: '#00d09c' }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7c8099' }}>
+                                  <span>1 Year</span>
+                                  <span>10 Years</span>
+                                </div>
+                              </div>
+
+                              <div>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 6 }}>
+                                  <Text style={{ color: tc, fontWeight: 600 }}>Expected Sector CAGR</Text>
+                                  <Text style={{ color: '#00d09c', fontWeight: 800 }}>{calcGrowthRate}% p.a.</Text>
+                                </div>
+                                <Slider 
+                                  min={5} 
+                                  max={100} 
+                                  step={5}
+                                  value={calcGrowthRate} 
+                                  onChange={(val) => setCalcGrowthRate(val)} 
+                                  trackStyle={{ backgroundColor: '#00d09c' }}
+                                  handleStyle={{ borderColor: '#00d09c' }}
+                                />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#7c8099' }}>
+                                  <span>5% CAGR</span>
+                                  <span>100% CAGR</span>
+                                </div>
+                              </div>
+                            </div>
+                          </Col>
+
+                          {/* Right Panel: Side-by-Side Comparison */}
+                          <Col xs={24} md={12}>
+                            <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+                              {/* One-Time Card */}
+                              <Col span={12}>
+                                <div style={{ 
+                                  background: isDarkMode ? '#1e293b' : '#f0fdf4', 
+                                  padding: '12px 14px', 
+                                  borderRadius: 10,
+                                  border: isDarkMode ? '1px solid #334155' : '1px solid #bbf7d0',
+                                  textAlign: 'center'
+                                }}>
+                                  <Tag color="success" style={{ marginBottom: 4, borderRadius: 4, fontWeight: 700 }}>ONE-TIME LUMP SUM</Tag>
+                                  <div style={{ fontSize: 16, fontWeight: 800, color: tc, marginTop: 4 }}>
+                                    ₹{oneTimeFV.toLocaleString()}
+                                  </div>
+                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
+                                    Net Profit: <strong style={{ color: '#00d09c' }}>+₹{oneTimeGain.toLocaleString()}</strong>
+                                  </Text>
+                                  <Tag color="green" style={{ marginTop: 8, fontSize: 10, fontWeight: 700 }}>
+                                    {oneTimeMult}x return
+                                  </Tag>
+                                </div>
+                              </Col>
+
+                              {/* SIP Card */}
+                              <Col span={12}>
+                                <div style={{ 
+                                  background: isDarkMode ? '#121824' : '#f5f3ff', 
+                                  padding: '12px 14px', 
+                                  borderRadius: 10,
+                                  border: isDarkMode ? '1px solid #1e293b' : '1px solid #ddd6fe',
+                                  textAlign: 'center'
+                                }}>
+                                  <Tag color="purple" style={{ marginBottom: 4, borderRadius: 4, fontWeight: 700 }}>MONTHLY SIP</Tag>
+                                  <div style={{ fontSize: 16, fontWeight: 800, color: tc, marginTop: 4 }}>
+                                    ₹{sipFV.toLocaleString()}
+                                  </div>
+                                  <Text type="secondary" style={{ fontSize: 10, display: 'block', marginTop: 2 }}>
+                                    (₹{Math.round(monthlyPayment).toLocaleString()}/month)
+                                  </Text>
+                                  <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>
+                                    Net Profit: <strong style={{ color: '#8b5cf6' }}>+₹{sipGain.toLocaleString()}</strong>
+                                  </Text>
+                                  <Tag color="purple" style={{ marginTop: 8, fontSize: 10, fontWeight: 700 }}>
+                                    {sipMult}x return
+                                  </Tag>
+                                </div>
+                              </Col>
+                            </Row>
+
+                            {/* SVG Comparison Sparkline Chart */}
+                            <div style={{ 
+                              background: isDarkMode ? '#0f172a' : '#ffffff', 
+                              border: `1px solid ${borderCl}`, 
+                              borderRadius: 10, 
+                              padding: '12px 16px' 
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                                <Text style={{ fontSize: 11, fontWeight: 700, color: tc }}>GROWTH TRAJECTORY CHART</Text>
+                                <div style={{ display: 'flex', gap: 12, fontSize: 10 }}>
+                                  <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#00d09c', marginRight: 4, borderRadius: '50%' }}></span>One-Time</span>
+                                  <span><span style={{ display: 'inline-block', width: 8, height: 8, background: '#8b5cf6', marginRight: 4, borderRadius: '50%' }}></span>SIP</span>
+                                </div>
+                              </div>
+                              
+                              <svg width="100%" height="90" viewBox="0 0 300 130" style={{ overflow: 'visible' }}>
+                                {/* Horizontal Grid lines */}
+                                <line x1="20" y1="40" x2="280" y2="40" stroke={isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'} strokeDasharray="2 2" />
+                                <line x1="20" y1="80" x2="280" y2="80" stroke={isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'} strokeDasharray="2 2" />
+                                <line x1="20" y1="120" x2="280" y2="120" stroke={isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'} />
+
+                                {/* One-Time Path */}
+                                <path 
+                                  d={`M ${oneTimePoints.join(' L ')}`} 
+                                  fill="none" 
+                                  stroke="#00d09c" 
+                                  strokeWidth="2.5" 
+                                  strokeLinecap="round" 
+                                />
+                                
+                                {/* SIP Path */}
+                                <path 
+                                  d={`M ${sipPoints.join(' L ')}`} 
+                                  fill="none" 
+                                  stroke="#8b5cf6" 
+                                  strokeWidth="2.5" 
+                                  strokeLinecap="round" 
+                                />
+
+                                {/* Start and End Markers */}
+                                <circle cx="20" cy="120" r="3" fill="#6b7280" />
+                                <circle cx="280" cy={120 - ((oneTimeFV - minVal) / range) * 80} r="4.5" fill="#00d09c" stroke="#fff" strokeWidth="1.5" />
+                                <circle cx="280" cy={120 - ((sipFV - minVal) / range) * 80} r="4.5" fill="#8b5cf6" stroke="#fff" strokeWidth="1.5" />
+
+                                {/* X-axis labels */}
+                                <text x="20" y="132" fill="#7c8099" style={{ fontSize: '9px', fontWeight: 600 }} textAnchor="middle">Today</text>
+                                <text x="150" y="132" fill="#7c8099" style={{ fontSize: '9px', fontWeight: 600 }} textAnchor="middle">Horizon half</text>
+                                <text x="280" y="132" fill="#7c8099" style={{ fontSize: '9px', fontWeight: 600 }} textAnchor="middle">{calcDuration} yr{calcDuration === 1 ? '' : 's'}</text>
+                              </svg>
+                            </div>
+                          </Col>
+                        </Row>
+                      );
+                    })()}
                   </Card>
                 </div>
               )
