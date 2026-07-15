@@ -672,11 +672,15 @@ router.get('/baskets', verifyToken, async (req, res) => {
 
 // POST Invest in a Basket
 router.post('/baskets/invest', verifyToken, async (req, res) => {
-  const { basketId, totalAmount } = req.body;
+  const { basketId, totalAmount, paymentType = 'onetime', sipDuration } = req.body;
   const userId = req.user.id;
   
   if (!basketId || !totalAmount || totalAmount < 5000) {
     return res.status(400).json({ error: 'Invalid investment amount. Minimum investment is ₹5,000 for a basket.' });
+  }
+
+  if (paymentType === 'sip' && (!sipDuration || sipDuration < 1)) {
+    return res.status(400).json({ error: 'SIP duration must be at least 1 month.' });
   }
   
   const User = require('../models/user');
@@ -695,7 +699,10 @@ router.post('/baskets/invest', verifyToken, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    if (user.walletBalance < totalAmount) {
+    // For one-time: deduct full amount. For SIP: deduct first instalment only.
+    const deductAmount = totalAmount; // totalAmount is always per-instalment from frontend
+    
+    if (user.walletBalance < deductAmount) {
       return res.status(400).json({ error: 'Insufficient wallet balance' });
     }
     
@@ -721,12 +728,16 @@ router.post('/baskets/invest', verifyToken, async (req, res) => {
     const investmentsCreated = [];
     let spentAmount = 0;
     
+    const investmentNote = paymentType === 'sip'
+      ? `[SIP ${1}/${sipDuration}] ${basket.name}`
+      : basket.name;
+    
     for (let i = 0; i < constituentsToInvest.length; i++) {
       const { startup, weight } = constituentsToInvest[i];
       const isLast = i === constituentsToInvest.length - 1;
       const startupAmount = isLast 
-        ? (totalAmount - spentAmount) 
-        : Math.round(totalAmount * (weight / totalWeight));
+        ? (deductAmount - spentAmount) 
+        : Math.round(deductAmount * (weight / totalWeight));
       
       spentAmount += startupAmount;
       
@@ -735,7 +746,8 @@ router.post('/baskets/invest', verifyToken, async (req, res) => {
           userId: user._id,
           startupId: startup._id,
           amount: startupAmount,
-          timestamp: new Date()
+          timestamp: new Date(),
+          note: investmentNote
         });
         await investment.save();
         
@@ -751,20 +763,30 @@ router.post('/baskets/invest', verifyToken, async (req, res) => {
       }
     }
     
-    user.walletBalance -= totalAmount;
+    user.walletBalance -= deductAmount;
     await user.save();
+    
+    const txDescription = paymentType === 'sip'
+      ? `SIP instalment 1/${sipDuration} — ${basket.name} (₹${deductAmount.toLocaleString()}/mo)`
+      : `One-time investment — ${basket.name}`;
     
     const walletTx = new WalletTransaction({
       userId: user._id,
-      amount: totalAmount,
+      amount: deductAmount,
       type: 'debit',
-      description: `Invested in ${basket.name}`,
+      description: txDescription,
       timestamp: new Date()
     });
     await walletTx.save();
     
+    const responseMessage = paymentType === 'sip'
+      ? `SIP started! First instalment of ₹${deductAmount.toLocaleString()} deducted. ${sipDuration - 1} more monthly payments of ₹${deductAmount.toLocaleString()} scheduled.`
+      : `Successfully invested ₹${deductAmount.toLocaleString()} in ${basket.name}`;
+    
     res.status(200).json({
-      message: `Successfully invested ₹${totalAmount.toLocaleString()} in ${basket.name}`,
+      message: responseMessage,
+      paymentType,
+      sipDuration: paymentType === 'sip' ? sipDuration : null,
       walletBalance: user.walletBalance,
       investments: investmentsCreated
     });

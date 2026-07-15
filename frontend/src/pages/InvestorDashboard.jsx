@@ -245,6 +245,8 @@ export default function InvestorDashboard() {
   const [selectedBasket, setSelectedBasket] = useState(null);
   const [basketInvestAmount, setBasketInvestAmount] = useState(10000);
   const [submittingBasketInvest, setSubmittingBasketInvest] = useState(false);
+  const [basketPaymentType, setBasketPaymentType] = useState('onetime'); // 'onetime' | 'sip'
+  const [sipDuration, setSipDuration] = useState(12); // months
 
   // States for Dynamic Valuation Sliders & Live Activity Feed
   const [projectionGrowth, setProjectionGrowth] = useState(25);
@@ -1049,14 +1051,21 @@ export default function InvestorDashboard() {
         },
         body: JSON.stringify({
           basketId: selectedBasket.id,
-          totalAmount: basketInvestAmount
+          totalAmount: basketInvestAmount,
+          paymentType: basketPaymentType,
+          sipDuration: basketPaymentType === 'sip' ? sipDuration : undefined
         })
       });
       
       if (res.ok) {
         const data = await res.json();
-        message.success(data.message || `Successfully invested ₹${basketInvestAmount.toLocaleString()} in the basket!`);
+        const successMsg = basketPaymentType === 'sip'
+          ? `🟣 SIP started! ₹${basketInvestAmount.toLocaleString()}/month for ${sipDuration} months. First instalment deducted.`
+          : `✅ Invested ₹${basketInvestAmount.toLocaleString()} in ${selectedBasket.name}!`;
+        message.success(data.message || successMsg, 4);
         setBasketModalVisible(false);
+        setBasketPaymentType('onetime');
+        setSipDuration(12);
         // Refresh dashboard data to reflect wallet and investments
         fetchData();
       } else {
@@ -2733,20 +2742,27 @@ export default function InvestorDashboard() {
 
       {/* Checkout Basket Investment Modal */}
       <Modal
-        title={<span style={{ color: tc, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}>Confirm Basket Investment</span>}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 20 }}>📦</span>
+            <span style={{ color: tc, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}>Invest in Basket</span>
+          </div>
+        }
         open={basketModalVisible}
         onOk={handleConfirmBasketInvestment}
-        onCancel={() => setBasketModalVisible(false)}
+        onCancel={() => { setBasketModalVisible(false); setBasketPaymentType('onetime'); setSipDuration(12); }}
         confirmLoading={submittingBasketInvest}
-        okText="Confirm Investment"
+        okText={basketPaymentType === 'sip' ? `Start SIP — ₹${(basketInvestAmount || 0).toLocaleString()}/mo` : 'Confirm One-Time Investment'}
+        width={560}
         okButtonProps={{
           style: {
-            backgroundColor: '#00d09c',
-            borderColor: '#00d09c',
+            backgroundColor: basketPaymentType === 'sip' ? '#8b5cf6' : '#00d09c',
+            borderColor: basketPaymentType === 'sip' ? '#8b5cf6' : '#00d09c',
             color: '#fff',
             borderRadius: 8,
-            height: 38,
-            fontWeight: 700
+            height: 40,
+            fontWeight: 700,
+            fontSize: 13
           }
         }}
         cancelButtonProps={{
@@ -2755,71 +2771,191 @@ export default function InvestorDashboard() {
             color: tc,
             border: isDarkMode ? '1px solid #374151' : 'none',
             borderRadius: 8,
-            height: 38
+            height: 40
           }
         }}
         style={{ borderRadius: 16 }}
-        styles={{ body: { padding: '16px 0' } }}
+        styles={{ body: { padding: '8px 0 16px' } }}
         wrapClassName="invest-modal-wrap"
       >
-        <div style={{ background: bgInner, padding: 20, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7', marginBottom: 20 }}>
+        {/* Basket Info Header */}
+        <div style={{ background: isDarkMode ? 'linear-gradient(135deg, #111827, #1a2035)' : 'linear-gradient(135deg, #f0fdf4, #eff6ff)', padding: '14px 16px', borderRadius: 10, border: `1px solid ${borderCl}`, marginBottom: 20 }}>
           {selectedBasket && (
-            <>
-              <Statistic 
-                title={<span style={{ color: '#7c8099', fontSize: 12 }}>MUTUAL FUND BASKET</span>} 
-                value={selectedBasket.name} 
-                valueStyle={{ color: tc, fontSize: 20, fontFamily: 'Outfit', fontWeight: 800 }}
-              />
-              <Paragraph style={{ color: '#7c8099', marginTop: 12, marginBottom: 0 }}>
-                Includes {selectedBasket.constituents.length} startups with instant diversification.
-              </Paragraph>
-            </>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 8, background: isDarkMode ? '#1e293b' : '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${borderCl}` }}>
+                {getBasketIcon(selectedBasket.icon)}
+              </div>
+              <div>
+                <Text style={{ fontSize: 15, fontWeight: 800, color: tc, display: 'block' }}>{selectedBasket.name}</Text>
+                <Text style={{ fontSize: 11, color: '#7c8099' }}>{selectedBasket.constituents.length} startups · Min ₹5,000</Text>
+              </div>
+            </div>
           )}
         </div>
 
-        <Text style={{ color: tc, display: 'block', marginBottom: 8, fontWeight: 600 }}>Capital Allocation (Min ₹5,000)</Text>
-        {currentUser && basketInvestAmount > currentUser.walletBalance && (
-          <Alert 
-            message={`Insufficient wallet balance (Your balance: ₹${currentUser.walletBalance.toLocaleString()})`} 
-            type="error" 
-            showIcon 
-            style={{ marginBottom: 12 }} 
-          />
-        )}
-        <InputNumber
-          min={5000}
-          value={basketInvestAmount}
-          onChange={setBasketInvestAmount}
-          onPressEnter={handleConfirmBasketInvestment}
-          formatter={value => `₹ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-          parser={value => value.replace(/\₹\s?|(,*)/g, '')}
-          style={{ width: '100%', height: 42, background: isDarkMode ? '#121620' : '#ffffff', color: tc, border: isDarkMode ? '1px solid #1f2937' : '1px solid #d1d5db', borderRadius: 8, fontSize: 16 }}
-        />
-
-        {selectedBasket && basketInvestAmount >= 5000 && (
-          <div style={{ marginTop: 24, borderTop: `1px solid ${borderCl}`, paddingTop: 20 }}>
-            <Text style={{ color: tc, fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 12 }}>
-              📊 Proportional Capital Distribution
-            </Text>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {selectedBasket.constituents.map((item, idx) => {
-                const allocated = Math.round(basketInvestAmount * (item.weight / 100));
-                return (
-                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isDarkMode ? '#111827' : '#f8fafc', padding: '8px 12px', borderRadius: 8, border: `1px solid ${borderCl}` }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Avatar size="small" src={item.logoUrl} style={{ backgroundColor: '#00d09c' }}>{item.name[0]}</Avatar>
-                      <Text style={{ fontWeight: 600, color: tc }}>{item.name}</Text>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{allocated.toLocaleString()}</Text>
-                      <br />
-                      <Text type="secondary" style={{ fontSize: 10 }}>{item.weight}% weight</Text>
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Payment Type Toggle */}
+        <div style={{ marginBottom: 20 }}>
+          <Text style={{ color: '#7c8099', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 10 }}>Investment Type</Text>
+          <Radio.Group
+            value={basketPaymentType}
+            onChange={(e) => setBasketPaymentType(e.target.value)}
+            style={{ width: '100%' }}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <Radio.Button
+                value="onetime"
+                style={{
+                  height: 'auto',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  textAlign: 'left',
+                  border: basketPaymentType === 'onetime' ? '2px solid #00d09c' : `2px solid ${borderCl}`,
+                  background: basketPaymentType === 'onetime' ? (isDarkMode ? 'rgba(0,208,156,0.1)' : 'rgba(0,208,156,0.05)') : (isDarkMode ? '#111827' : '#f8fafc')
+                }}
+              >
+                <span style={{ fontSize: 18 }}>💰</span>
+                <Text style={{ fontWeight: 800, fontSize: 13, color: basketPaymentType === 'onetime' ? '#00d09c' : tc, display: 'block', marginTop: 4 }}>One-Time</Text>
+                <Text style={{ fontSize: 10, color: '#7c8099', lineHeight: 1.4, display: 'block' }}>Invest a lump sum amount right now.</Text>
+              </Radio.Button>
+              <Radio.Button
+                value="sip"
+                style={{
+                  height: 'auto',
+                  padding: '12px 16px',
+                  borderRadius: 10,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  textAlign: 'left',
+                  border: basketPaymentType === 'sip' ? '2px solid #8b5cf6' : `2px solid ${borderCl}`,
+                  background: basketPaymentType === 'sip' ? (isDarkMode ? 'rgba(139,92,246,0.1)' : 'rgba(139,92,246,0.05)') : (isDarkMode ? '#111827' : '#f8fafc')
+                }}
+              >
+                <span style={{ fontSize: 18 }}>📅</span>
+                <Text style={{ fontWeight: 800, fontSize: 13, color: basketPaymentType === 'sip' ? '#8b5cf6' : tc, display: 'block', marginTop: 4 }}>Monthly SIP</Text>
+                <Text style={{ fontSize: 10, color: '#7c8099', lineHeight: 1.4, display: 'block' }}>Auto-invest monthly for rupee-cost averaging.</Text>
+              </Radio.Button>
             </div>
+          </Radio.Group>
+        </div>
+
+        {/* Amount Input */}
+        <div style={{ marginBottom: basketPaymentType === 'sip' ? 16 : 0 }}>
+          <Text style={{ color: '#7c8099', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+            {basketPaymentType === 'sip' ? 'Monthly SIP Amount (Min ₹5,000/month)' : 'Investment Amount (Min ₹5,000)'}
+          </Text>
+          {currentUser && basketInvestAmount > currentUser.walletBalance && (
+            <Alert
+              message={`Insufficient wallet balance (Available: ₹${currentUser.walletBalance.toLocaleString()})`}
+              type="error"
+              showIcon
+              style={{ marginBottom: 10 }}
+            />
+          )}
+          <InputNumber
+            min={5000}
+            value={basketInvestAmount}
+            onChange={setBasketInvestAmount}
+            onPressEnter={handleConfirmBasketInvestment}
+            formatter={value => `₹ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+            parser={value => value.replace(/₹\s?|(,*)/g, '')}
+            style={{ width: '100%', height: 44, background: isDarkMode ? '#121620' : '#ffffff', color: tc, border: isDarkMode ? '1px solid #374151' : '1px solid #d1d5db', borderRadius: 8, fontSize: 16 }}
+          />
+        </div>
+
+        {/* SIP Duration Selector */}
+        {basketPaymentType === 'sip' && (
+          <div style={{ marginBottom: 16 }}>
+            <Text style={{ color: '#7c8099', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>SIP Duration</Text>
+            <Radio.Group
+              value={sipDuration}
+              onChange={(e) => setSipDuration(e.target.value)}
+              buttonStyle="solid"
+              size="middle"
+              style={{ width: '100%' }}
+            >
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {[3, 6, 12, 24, 36].map(mo => (
+                  <Radio.Button
+                    key={mo}
+                    value={mo}
+                    style={{
+                      borderRadius: 6,
+                      flex: 1,
+                      textAlign: 'center',
+                      fontWeight: 600,
+                      minWidth: 60,
+                      background: sipDuration === mo ? '#8b5cf6' : (isDarkMode ? '#111827' : '#f8fafc'),
+                      borderColor: sipDuration === mo ? '#8b5cf6' : borderCl,
+                      color: sipDuration === mo ? '#fff' : tc
+                    }}
+                  >
+                    {mo < 12 ? `${mo}M` : `${mo / 12}Y`}
+                  </Radio.Button>
+                ))}
+              </div>
+            </Radio.Group>
           </div>
+        )}
+
+        {/* Summary Box */}
+        {selectedBasket && basketInvestAmount >= 5000 && (
+          <>
+            {/* SIP Summary */}
+            {basketPaymentType === 'sip' && (
+              <div style={{ background: isDarkMode ? 'rgba(139,92,246,0.08)' : 'rgba(139,92,246,0.05)', border: '1.5px solid #8b5cf6', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+                <Text style={{ color: '#8b5cf6', fontWeight: 800, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 10 }}>📅 SIP Summary</Text>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text style={{ display: 'block', fontSize: 10, color: '#7c8099', fontWeight: 600, marginBottom: 2 }}>MONTHLY</Text>
+                    <Text style={{ display: 'block', fontWeight: 800, color: '#8b5cf6', fontSize: 16 }}>₹{(basketInvestAmount || 0).toLocaleString()}</Text>
+                  </div>
+                  <div style={{ textAlign: 'center', borderLeft: `1px solid ${borderCl}`, borderRight: `1px solid ${borderCl}` }}>
+                    <Text style={{ display: 'block', fontSize: 10, color: '#7c8099', fontWeight: 600, marginBottom: 2 }}>DURATION</Text>
+                    <Text style={{ display: 'block', fontWeight: 800, color: tc, fontSize: 16 }}>{sipDuration} months</Text>
+                  </div>
+                  <div style={{ textAlign: 'center' }}>
+                    <Text style={{ display: 'block', fontSize: 10, color: '#7c8099', fontWeight: 600, marginBottom: 2 }}>TOTAL COMMITMENT</Text>
+                    <Text style={{ display: 'block', fontWeight: 800, color: '#00d09c', fontSize: 16 }}>₹{((basketInvestAmount || 0) * sipDuration).toLocaleString()}</Text>
+                  </div>
+                </div>
+                <Alert
+                  message="First SIP instalment will be deducted now. Remaining will be auto-debited monthly."
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 12, fontSize: 11 }}
+                  banner={false}
+                />
+              </div>
+            )}
+
+            {/* Proportional Distribution */}
+            <div style={{ borderTop: `1px solid ${borderCl}`, paddingTop: 16 }}>
+              <Text style={{ color: tc, fontWeight: 700, fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', marginBottom: 10 }}>
+                📊 Allocation per startup {basketPaymentType === 'sip' ? '(per month)' : ''}
+              </Text>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedBasket.constituents.map((item, idx) => {
+                  const allocated = Math.round(basketInvestAmount * (item.weight / 100));
+                  return (
+                    <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isDarkMode ? '#111827' : '#f8fafc', padding: '8px 12px', borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <Avatar size="small" src={item.logoUrl} style={{ backgroundColor: '#00d09c', fontSize: 10 }}>{item.name[0]}</Avatar>
+                        <Text style={{ fontWeight: 600, color: tc, fontSize: 13 }}>{item.name}</Text>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <Text style={{ color: basketPaymentType === 'sip' ? '#8b5cf6' : '#00d09c', fontWeight: 700 }}>₹{allocated.toLocaleString()}</Text>
+                        <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>{item.weight}% weight</Text>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </>
         )}
       </Modal>
 
