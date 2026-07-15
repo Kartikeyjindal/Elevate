@@ -112,6 +112,12 @@ const mockMongoose = {
         if (!this._id) {
           this._id = generateId();
         }
+        if (!this.createdAt) {
+          this.createdAt = new Date();
+        }
+        if (!this.updatedAt) {
+          this.updatedAt = new Date();
+        }
       }
 
       async save(options = {}) {

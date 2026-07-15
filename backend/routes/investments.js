@@ -24,6 +24,64 @@ if (!isRazorpayMock) {
   }
 }
 
+// Helper to execute investment non-transactionally on standalone databases
+async function executeSequentialInvestment(userId, startupId, investAmount, res) {
+  const User = require('../models/user');
+  const Startup = require('../models/startup');
+  const Investment = require('../models/investment');
+
+  const user = await User.findById(userId);
+  if (!user) {
+    return res.status(404).json({ error: 'User not found' });
+  }
+
+  if (user.walletBalance < investAmount) {
+    return res.status(400).json({ error: 'Insufficient wallet balance' });
+  }
+
+  const startup = await Startup.findById(startupId);
+  if (!startup) {
+    return res.status(404).json({ error: 'Startup not found' });
+  }
+
+  if (startup.status !== 'approved') {
+    return res.status(400).json({ error: 'Startup is not approved for investment' });
+  }
+
+  // Perform updates
+  user.walletBalance -= investAmount;
+  const newInvestment = new Investment({
+    userId,
+    startupId,
+    amount: investAmount
+  });
+  const savedInvestment = await newInvestment.save();
+
+  user.portfolio.push(savedInvestment._id);
+  await user.save();
+
+  // Log wallet transaction
+  const WalletTransaction = require('../models/walletTransaction');
+  const tx = new WalletTransaction({
+    userId,
+    type: 'investment',
+    amount: investAmount,
+    status: 'completed',
+    referenceId: savedInvestment._id.toString(),
+    description: `Pledged capital to startup`
+  });
+  await tx.save();
+
+  startup.raisedAmount += investAmount;
+  await startup.save();
+
+  return res.status(201).json({
+    message: 'Investment executed successfully (Sequential Fallback)',
+    investment: savedInvestment,
+    updatedWalletBalance: user.walletBalance
+  });
+}
+
 router.post('/invest', verifyToken, async (req, res) => {
   const { startupId, amount } = req.body;
   const userId = req.user.id;
@@ -50,11 +108,19 @@ router.post('/invest', verifyToken, async (req, res) => {
 
   let session;
   try {
+    const isLocalOrStandalone = process.env.MONGO_URI && 
+                                (process.env.MONGO_URI.includes('localhost') || process.env.MONGO_URI.includes('127.0.0.1')) && 
+                                !process.env.MONGO_URI.includes('replicaSet');
+                                
+    if (isLocalOrStandalone) {
+      return await executeSequentialInvestment(userId, startupId, investAmount, res);
+    }
+
     session = await mongoose.startSession();
     session.startTransaction();
   } catch (err) {
     session = null;
-    console.warn('MongoDB Transaction Session could not start (likely standalone local DB). Falling back to non-transactional flow.');
+    console.warn('MongoDB Transaction Session could not start. Falling back to non-transactional flow.');
   }
 
   try {
@@ -128,63 +194,28 @@ router.post('/invest', verifyToken, async (req, res) => {
         updatedWalletBalance: user.walletBalance
       });
     } else {
-      // Fallback: Non-transactional execution for standalone local MongoDB instances
-      const user = await User.findById(userId);
-      if (!user) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      if (user.walletBalance < investAmount) {
-        return res.status(400).json({ error: 'Insufficient wallet balance' });
-      }
-
-      const startup = await Startup.findById(startupId);
-      if (!startup) {
-        return res.status(404).json({ error: 'Startup not found' });
-      }
-
-      if (startup.status !== 'approved') {
-        return res.status(400).json({ error: 'Startup is not approved for investment' });
-      }
-
-      // Perform updates
-      user.walletBalance -= investAmount;
-      const newInvestment = new Investment({
-        userId,
-        startupId,
-        amount: investAmount
-      });
-      const savedInvestment = await newInvestment.save();
-
-      user.portfolio.push(savedInvestment._id);
-      await user.save();
-
-      // Log wallet transaction
-      const WalletTransaction = require('../models/walletTransaction');
-      const tx = new WalletTransaction({
-        userId,
-        type: 'investment',
-        amount: investAmount,
-        status: 'completed',
-        referenceId: savedInvestment._id.toString(),
-        description: `Pledged capital to startup`
-      });
-      await tx.save();
-
-      startup.raisedAmount += investAmount;
-      await startup.save();
-
-      return res.status(201).json({
-        message: 'Investment executed successfully (Sequential Fallback)',
-        investment: savedInvestment,
-        updatedWalletBalance: user.walletBalance
-      });
+      return await executeSequentialInvestment(userId, startupId, investAmount, res);
     }
   } catch (error) {
     if (session) {
-      await session.abortTransaction();
+      try {
+        await session.abortTransaction();
+      } catch (_) {}
       session.endSession();
     }
+
+    const isReplicaSetError = error.message.includes('Transaction numbers') || 
+                              error.message.includes('replica set') || 
+                              error.message.includes('replicaSet');
+    if (isReplicaSetError) {
+      console.warn('MongoDB instance does not support transactions (standalone). Falling back to non-transactional execution.');
+      try {
+        return await executeSequentialInvestment(userId, startupId, investAmount, res);
+      } catch (fallbackErr) {
+        return res.status(500).json({ error: fallbackErr.message });
+      }
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -200,6 +231,52 @@ router.get('/my', verifyToken, async (req, res) => {
   }
 });
 
+// Helper to execute sell non-transactionally on standalone databases
+async function executeSequentialSell(userId, investmentId, res) {
+  const User = require('../models/user');
+  const Startup = require('../models/startup');
+  const Investment = require('../models/investment');
+
+  const investment = await Investment.findById(investmentId);
+  if (!investment) {
+    return res.status(404).json({ error: 'Investment not found' });
+  }
+
+  if (investment.userId.toString() !== userId) {
+    return res.status(403).json({ error: 'Not authorized to sell this investment' });
+  }
+
+  const user = await User.findById(userId);
+  user.walletBalance += investment.amount;
+  user.portfolio = user.portfolio.filter(id => id.toString() !== investmentId);
+  await user.save();
+
+  // Log wallet transaction
+  const WalletTransaction = require('../models/walletTransaction');
+  const tx = new WalletTransaction({
+    userId,
+    type: 'sell_return',
+    amount: investment.amount,
+    status: 'completed',
+    referenceId: investmentId,
+    description: `Sold shares (refunded to wallet)`
+  });
+  await tx.save();
+
+  const startup = await Startup.findById(investment.startupId);
+  if (startup) {
+    startup.raisedAmount = Math.max(0, startup.raisedAmount - investment.amount);
+    await startup.save();
+  }
+
+  await Investment.findByIdAndDelete(investmentId);
+
+  return res.status(200).json({
+    message: 'Shares sold successfully (Sequential Fallback)',
+    updatedWalletBalance: user.walletBalance
+  });
+}
+
 // Sell Investment
 router.post('/sell', verifyToken, async (req, res) => {
   const { investmentId } = req.body;
@@ -211,6 +288,14 @@ router.post('/sell', verifyToken, async (req, res) => {
 
   let session;
   try {
+    const isLocalOrStandalone = process.env.MONGO_URI && 
+                                (process.env.MONGO_URI.includes('localhost') || process.env.MONGO_URI.includes('127.0.0.1')) && 
+                                !process.env.MONGO_URI.includes('replicaSet');
+                                
+    if (isLocalOrStandalone) {
+      return await executeSequentialSell(userId, investmentId, res);
+    }
+
     session = await mongoose.startSession();
     session.startTransaction();
   } catch (err) {
@@ -265,50 +350,28 @@ router.post('/sell', verifyToken, async (req, res) => {
         updatedWalletBalance: user.walletBalance
       });
     } else {
-      const investment = await Investment.findById(investmentId);
-      if (!investment) {
-        return res.status(404).json({ error: 'Investment not found' });
-      }
-
-      if (investment.userId.toString() !== userId) {
-        return res.status(403).json({ error: 'Not authorized to sell this investment' });
-      }
-
-      const user = await User.findById(userId);
-      user.walletBalance += investment.amount;
-      user.portfolio = user.portfolio.filter(id => id.toString() !== investmentId);
-      await user.save();
-
-      // Log wallet transaction
-      const WalletTransaction = require('../models/walletTransaction');
-      const tx = new WalletTransaction({
-        userId,
-        type: 'sell_return',
-        amount: investment.amount,
-        status: 'completed',
-        referenceId: investmentId,
-        description: `Sold shares (refunded to wallet)`
-      });
-      await tx.save();
-
-      const startup = await Startup.findById(investment.startupId);
-      if (startup) {
-        startup.raisedAmount = Math.max(0, startup.raisedAmount - investment.amount);
-        await startup.save();
-      }
-
-      await Investment.findByIdAndDelete(investmentId);
-
-      return res.status(200).json({
-        message: 'Shares sold successfully',
-        updatedWalletBalance: user.walletBalance
-      });
+      return await executeSequentialSell(userId, investmentId, res);
     }
   } catch (error) {
     if (session) {
-      await session.abortTransaction();
+      try {
+        await session.abortTransaction();
+      } catch (_) {}
       session.endSession();
     }
+
+    const isReplicaSetError = error.message.includes('Transaction numbers') || 
+                              error.message.includes('replica set') || 
+                              error.message.includes('replicaSet');
+    if (isReplicaSetError) {
+      console.warn('MongoDB instance does not support transactions (standalone). Falling back to non-transactional execution.');
+      try {
+        return await executeSequentialSell(userId, investmentId, res);
+      } catch (fallbackErr) {
+        return res.status(500).json({ error: fallbackErr.message });
+      }
+    }
+
     res.status(500).json({ error: error.message });
   }
 });
@@ -504,14 +567,19 @@ router.post('/wallet/withdraw', verifyToken, async (req, res) => {
 router.get('/wallet/transactions', verifyToken, async (req, res) => {
   try {
     const WalletTransaction = require('../models/walletTransaction');
-    const txs = await WalletTransaction.find({ userId: req.user.id });
-    // Sort transactions by date descending
+    const allTxs = await WalletTransaction.find({});
+    const userIdStr = String(req.user.id);
+    const txs = allTxs.filter(tx => String(tx.userId) === userIdStr);
     txs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    console.log(`[wallet/transactions] userId=${userIdStr}, total=${allTxs.length}, filtered=${txs.length}`);
     res.json(txs);
   } catch (err) {
+    console.error('[wallet/transactions] error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
 
 module.exports = router;
+
+
 

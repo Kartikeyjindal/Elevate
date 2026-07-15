@@ -217,6 +217,7 @@ export default function InvestorDashboard() {
   const [companyDetailsVisible, setCompanyDetailsVisible] = useState(false);
   const [companyDetailsLoading, setCompanyDetailsLoading] = useState(false);
   const [companyDetailsData, setCompanyDetailsData] = useState(null);
+  const [currentCompanyHoldings, setCurrentCompanyHoldings] = useState([]);
   const [investAmount, setInvestAmount] = useState(10000);
   const [submittingInvestment, setSubmittingInvestment] = useState(false);
   const [expandedStartupId, setExpandedStartupId] = useState(null);
@@ -429,6 +430,7 @@ export default function InvestorDashboard() {
       localStorage.setItem('user', JSON.stringify(updatedUser));
       setCurrentUser(updatedUser);
       message.success('Simulated test payment successful!');
+      fetchData();
     } catch (err) {
       message.error(`Simulated Payment Failed: ${err.message}`);
     } finally {
@@ -649,6 +651,7 @@ export default function InvestorDashboard() {
               localStorage.setItem('user', JSON.stringify(updatedUser));
               setCurrentUser(updatedUser);
               message.success('Payment authorized and wallet credited successfully!');
+              fetchData();
             } catch (err) {
               message.error(`Verification Failed: ${err.message}`);
               setWalletStep(0);
@@ -793,7 +796,8 @@ export default function InvestorDashboard() {
           startupId: inv.startupId?._id,
           startupName: inv.startupId?.name || 'Unknown Startup',
           amount: inv.amount,
-          timestamp: new Date(inv.timestamp).toLocaleString(),
+          timestamp: new Date(inv.timestamp || inv.createdAt).toLocaleString(),
+          rawDate: new Date(inv.timestamp || inv.createdAt),
           startupObj: inv.startupId
         }));
         setMyInvestments(mappedInvestments);
@@ -817,14 +821,20 @@ export default function InvestorDashboard() {
         const newsData = await newsRes.json();
         setMarketNews(newsData);
       }
+      setNewsLoading(false);
       // Fetch wallet transactions
       setLoadingTransactions(true);
-      const txsRes = await fetch(`${API_URL}/api/wallet/transactions`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (txsRes.ok) {
-        const txsData = await txsRes.json();
-        setWalletTransactions(txsData);
+      try {
+        const txsRes = await fetch(`${API_URL}/api/wallet/transactions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const txsCt = txsRes.headers.get('content-type') || '';
+        if (txsRes.ok && txsCt.includes('application/json')) {
+          const txsData = await txsRes.json();
+          setWalletTransactions(Array.isArray(txsData) ? txsData : []);
+        }
+      } catch (_) {
+        // Silently fail - transactions just won't show
       }
       setLoadingTransactions(false);
     } catch (err) {
@@ -949,10 +959,11 @@ export default function InvestorDashboard() {
     ]
   };
 
-  const handleOpenCompanyDetails = async (startup) => {
+  const handleOpenCompanyDetails = async (startup, holdingTransactions = []) => {
     setCompanyDetailsVisible(true);
     setCompanyDetailsLoading(true);
     setCompanyDetailsData(null);
+    setCurrentCompanyHoldings(holdingTransactions);
     setProjectionGrowth(25);
     setProjectionRetention(85);
     try {
@@ -1003,6 +1014,7 @@ export default function InvestorDashboard() {
       startupName: selectedStartup.name,
       amount: investAmount,
       timestamp: new Date().toLocaleString(),
+      rawDate: new Date(),
       startupObj: selectedStartup
     };
     const prevUser = { ...currentUser };
@@ -1062,6 +1074,7 @@ export default function InvestorDashboard() {
       setCurrentUser(confirmedUser);
       localStorage.setItem('user', JSON.stringify(confirmedUser));
       message.success('✅ Investment confirmed!');
+      fetchData();
     } catch (err) {
       message.error(err.message);
     } finally {
@@ -1116,6 +1129,7 @@ export default function InvestorDashboard() {
       setCurrentUser(confirmedUser);
       localStorage.setItem('user', JSON.stringify(confirmedUser));
       message.success('✅ Shares sold and balance refunded!');
+      fetchData();
     } catch (err) {
       message.error(err.message);
     }
@@ -1181,7 +1195,7 @@ export default function InvestorDashboard() {
         <span 
           onClick={() => {
             if (record.startupObj) {
-              handleOpenCompanyDetails(record.startupObj);
+              handleOpenCompanyDetails(record.startupObj, record.transactions);
             }
           }}
           style={{ 
@@ -1264,7 +1278,16 @@ export default function InvestorDashboard() {
             danger 
             size="small"
             icon={<ArrowDownOutlined />}
-            onClick={() => handleSellInvestment(record.key)}
+            onClick={() => {
+              if (record.transactions && record.transactions.length > 1) {
+                handleOpenCompanyDetails(record.startupObj, record.transactions);
+                message.info("Select a specific transaction to sell from the list below.");
+              } else if (record.transactions && record.transactions.length === 1) {
+                handleSellInvestment(record.transactions[0].key);
+              } else {
+                handleSellInvestment(record.key);
+              }
+            }}
             style={{ borderRadius: 4, fontSize: 12, fontWeight: 700 }}
           >
             Sell
@@ -1299,16 +1322,9 @@ export default function InvestorDashboard() {
       amount,
       percentage: total > 0 ? (amount / total) * 100 : 0
     }));
-
     if (data.length === 0) {
-      return [
-        { category: 'CleanTech', amount: 0, percentage: 30, color: '#10b981' },
-        { category: 'AI & Robotics', amount: 0, percentage: 40, color: '#ec4899' },
-        { category: 'SaaS', amount: 0, percentage: 20, color: '#3b82f6' },
-        { category: 'Other', amount: 0, percentage: 10, color: '#8b5cf6' }
-      ];
+      return [];
     }
-
     const colors = ['#ec4899', '#10b981', '#fbbf24', '#3b82f6', '#8b5cf6', '#06b6d4'];
     let cumulativePercent = 0;
     return data.map((d, index) => {
@@ -1326,6 +1342,150 @@ export default function InvestorDashboard() {
   };
 
   const sectorSegments = getSectorExposureData();
+
+  // Calculate Portfolio Trajectory dynamically
+  const trajectoryData = React.useMemo(() => {
+    if (!myInvestments || myInvestments.length === 0) {
+      return { months: [], values: [], roi: 0 };
+    }
+
+    const mNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const today = new Date();
+    const last5Months = [];
+    for (let i = 4; i >= 0; i--) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      last5Months.push({
+        name: mNames[d.getMonth()],
+        month: d.getMonth(),
+        year: d.getFullYear(),
+        endOfMonthTimestamp: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59).getTime()
+      });
+    }
+
+    // For each month, calculate the portfolio value
+    const values = last5Months.map((m, idx) => {
+      let totalValueForMonth = 0;
+      let totalInvestedForMonth = 0;
+
+      myInvestments.forEach(inv => {
+        let invTimestamp = 0;
+        if (inv.rawDate) {
+          invTimestamp = inv.rawDate.getTime();
+        } else if (inv.timestamp) {
+          invTimestamp = new Date(inv.timestamp).getTime();
+        } else if (inv.createdAt) {
+          invTimestamp = new Date(inv.createdAt).getTime();
+        }
+
+        // Only include if the investment happened on or before the end of this month
+        if (invTimestamp <= m.endOfMonthTimestamp) {
+          const startup = inv.startupObj;
+          if (startup) {
+            const valuations = [...(startup.pastValuations || [])];
+            if (valuations.length === 0 || valuations[valuations.length - 1] !== startup.valuationCap) {
+              if (startup.valuationCap) {
+                valuations.push(startup.valuationCap);
+              }
+            }
+            
+            const K = valuations.length;
+            if (K > 0) {
+              const initialValuation = valuations[0] || 1;
+              const valIdx = Math.min(K - 1, Math.floor(idx * (K - 1) / 4));
+              const currentValuationForMonth = valuations[valIdx];
+              const ratio = currentValuationForMonth / initialValuation;
+              totalValueForMonth += inv.amount * ratio;
+            } else {
+              totalValueForMonth += inv.amount;
+            }
+          } else {
+            totalValueForMonth += inv.amount;
+          }
+          totalInvestedForMonth += inv.amount;
+        }
+      });
+
+      return {
+        value: totalValueForMonth,
+        invested: totalInvestedForMonth
+      };
+    });
+
+    const latestVal = values[values.length - 1] || { value: 0, invested: 0 };
+    const totalInvested = latestVal.invested;
+    const finalValue = latestVal.value;
+    const roi = totalInvested > 0 ? ((finalValue - totalInvested) / totalInvested) * 100 : 0;
+
+    return {
+      months: last5Months.map(m => m.name),
+      values: values.map(v => v.value),
+      roi: roi
+    };
+  }, [myInvestments]);
+
+  const svgPoints = React.useMemo(() => {
+    if (!trajectoryData || trajectoryData.values.length === 0) return [];
+    const maxVal = Math.max(...trajectoryData.values);
+    const minVal = Math.min(...trajectoryData.values);
+    return trajectoryData.values.map((v, i) => {
+      const x = 10 + 70 * i;
+      const y = maxVal - minVal === 0 ? 50 : 80 - ((v - minVal) / (maxVal - minVal)) * (80 - 20);
+      return { x, y, value: v };
+    });
+  }, [trajectoryData]);
+
+  const linePath = React.useMemo(() => {
+    if (svgPoints.length === 0) return '';
+    return "M " + svgPoints.map(p => `${p.x} ${p.y}`).join(" L ");
+  }, [svgPoints]);
+
+  const areaPath = React.useMemo(() => {
+    if (svgPoints.length === 0) return '';
+    return `M 10 90 L ${svgPoints.map(p => `${p.x} ${p.y}`).join(" L ")} L 290 90 Z`;
+  }, [svgPoints]);
+
+  // Group investments by company to combine duplicates
+  const groupedHoldings = React.useMemo(() => {
+    if (!myInvestments || myInvestments.length === 0) return [];
+    
+    const groups = {};
+    myInvestments.forEach(inv => {
+      const key = inv.startupId || inv.startupName;
+      if (!groups[key]) {
+        groups[key] = {
+          startupId: inv.startupId,
+          startupName: inv.startupName,
+          startupObj: inv.startupObj,
+          amount: 0,
+          transactions: [],
+          latestTimestamp: null
+        };
+      }
+      groups[key].amount += inv.amount;
+      groups[key].transactions.push(inv);
+      
+      const invDate = inv.rawDate || new Date(inv.timestamp || inv.createdAt);
+      if (!groups[key].latestTimestamp || invDate > groups[key].latestTimestamp) {
+        groups[key].latestTimestamp = invDate;
+      }
+    });
+
+    return Object.values(groups).map(g => ({
+      key: g.startupId || g.startupName,
+      startupId: g.startupId,
+      startupName: g.startupName,
+      startupObj: g.startupObj,
+      amount: g.amount,
+      transactions: g.transactions.sort((a, b) => {
+        const da = a.rawDate || new Date(a.timestamp || a.createdAt);
+        const db = b.rawDate || new Date(b.timestamp || b.createdAt);
+        return db - da; // newest first
+      }),
+      timestamp: g.transactions.length > 1 
+        ? `Multiple (${g.transactions.length})` 
+        : (g.latestTimestamp ? g.latestTimestamp.toLocaleString() : '')
+    }));
+  }, [myInvestments]);
 
   return (
     <Layout style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#0b0f19' : '#f4f6f9' }}>
@@ -1739,21 +1899,35 @@ export default function InvestorDashboard() {
                 <div style={{ marginTop: 16 }}>
                   {/* Row 1: Capital Stats */}
                   <Row gutter={[16, 16]} style={{ marginBottom: 16 }}>
-                    <Col xs={24} md={12}>
+                    <Col xs={24} md={8}>
                       <Card style={{ background: bgInner, border: `1px solid ${borderCl}` }}>
                         <Statistic 
                           title={<span style={{ color: '#7c8099', fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>Capital Deployed</span>} 
                           value={`₹${totalInvestedMyPortfolio.toLocaleString()}`} 
-                          valueStyle={{ color: '#10b981', fontSize: 26, fontFamily: 'Outfit', fontWeight: 800 }}
+                          valueStyle={{ color: '#10b981', fontSize: 24, fontFamily: 'Outfit', fontWeight: 800 }}
                         />
                       </Card>
                     </Col>
-                    <Col xs={24} md={12}>
+                    <Col xs={24} md={8}>
+                      <Card style={{ background: bgInner, border: `1px solid ${borderCl}` }}>
+                        <Statistic 
+                          title={<span style={{ color: '#7c8099', fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>Current Valuation</span>} 
+                          value={`₹${(trajectoryData.values[trajectoryData.values.length - 1] || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} 
+                          valueStyle={{ 
+                            color: trajectoryData.roi >= 0 ? '#00d09c' : '#ef4444', 
+                            fontSize: 24, 
+                            fontFamily: 'Outfit', 
+                            fontWeight: 800 
+                          }}
+                        />
+                      </Card>
+                    </Col>
+                    <Col xs={24} md={8}>
                       <Card style={{ background: bgInner, border: `1px solid ${borderCl}` }}>
                         <Statistic 
                           title={<span style={{ color: '#7c8099', fontWeight: 600, fontSize: 13, textTransform: 'uppercase' }}>Active Holdings</span>} 
                           value={myInvestments.length} 
-                          valueStyle={{ color: '#00d09c', fontSize: 26, fontFamily: 'Outfit', fontWeight: 800 }}
+                          valueStyle={{ color: '#3b82f6', fontSize: 24, fontFamily: 'Outfit', fontWeight: 800 }}
                         />
                       </Card>
                     </Col>
@@ -1767,48 +1941,56 @@ export default function InvestorDashboard() {
                         <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: '0 0 16px 0', fontSize: 14 }}>
                           🍰 Asset Allocation & Sector Exposure
                         </Title>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: 16 }}>
-                          <div style={{ position: 'relative', width: 130, height: 130 }}>
-                            <svg width="130" height="130" viewBox="0 0 42 42">
-                              <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke={isDarkMode ? '#1f2937' : '#e5e7eb'} strokeWidth="4.5"></circle>
+                        {myInvestments.length === 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 180, textAlign: 'center', padding: '0 16px' }}>
+                            <PieChartOutlined style={{ fontSize: 36, color: '#00d09c', marginBottom: 12, opacity: 0.8 }} />
+                            <Text style={{ color: tc, fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>No Holdings Found</Text>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Deploy capital from the Marketplace tab to unlock sector allocation insights.</Text>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', flexWrap: 'wrap', gap: 16 }}>
+                            <div style={{ position: 'relative', width: 130, height: 130 }}>
+                              <svg width="130" height="130" viewBox="0 0 42 42">
+                                <circle cx="21" cy="21" r="15.91549430918954" fill="transparent" stroke={isDarkMode ? '#1f2937' : '#e5e7eb'} strokeWidth="4.5"></circle>
+                                {sectorSegments.map((seg, i) => (
+                                  <circle 
+                                    key={i}
+                                    cx="21" 
+                                    cy="21" 
+                                    r="15.91549430918954" 
+                                    fill="transparent" 
+                                    stroke={seg.color} 
+                                    strokeWidth="4.5" 
+                                    strokeDasharray={seg.strokeDash} 
+                                    strokeDashoffset={seg.strokeOffset}
+                                    style={{ transition: 'stroke-dashoffset 0.3s' }}
+                                  />
+                                ))}
+                                <g style={{ transform: 'translate(0px, 0px)' }}>
+                                  <text x="50%" y="46%" textAnchor="middle" fill={tc} style={{ fontSize: '3.8px', fontWeight: 800, fontFamily: 'Outfit' }}>
+                                    {totalInvestedMyPortfolio > 0 ? `₹${totalInvestedMyPortfolio >= 100000 ? (totalInvestedMyPortfolio / 1000).toFixed(0) + 'K' : totalInvestedMyPortfolio.toLocaleString()}` : '₹0'}
+                                  </text>
+                                  <text x="50%" y="58%" textAnchor="middle" fill="#7c8099" style={{ fontSize: '2px', fontWeight: 700, letterSpacing: '0.1px' }}>
+                                    INVESTED
+                                  </text>
+                                </g>
+                              </svg>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 160 }}>
                               {sectorSegments.map((seg, i) => (
-                                <circle 
-                                  key={i}
-                                  cx="21" 
-                                  cy="21" 
-                                  r="15.91549430918954" 
-                                  fill="transparent" 
-                                  stroke={seg.color} 
-                                  strokeWidth="4.5" 
-                                  strokeDasharray={seg.strokeDash} 
-                                  strokeDashoffset={seg.strokeOffset}
-                                  style={{ transition: 'stroke-dashoffset 0.3s' }}
-                                />
+                                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
+                                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, display: 'inline-block' }} />
+                                  <span style={{ color: tc, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: 90 }}>
+                                    {seg.category}
+                                  </span>
+                                  <span style={{ color: '#7c8099', fontWeight: 700 }}>
+                                    {seg.percentage.toFixed(0)}%
+                                  </span>
+                                </div>
                               ))}
-                              <g style={{ transform: 'translate(0px, 0px)' }}>
-                                <text x="50%" y="46%" textAnchor="middle" fill={tc} style={{ fontSize: '3.8px', fontWeight: 800, fontFamily: 'Outfit' }}>
-                                  {totalInvestedMyPortfolio > 0 ? `₹${totalInvestedMyPortfolio >= 100000 ? (totalInvestedMyPortfolio / 1000).toFixed(0) + 'K' : totalInvestedMyPortfolio.toLocaleString()}` : '₹0'}
-                                </text>
-                                <text x="50%" y="58%" textAnchor="middle" fill="#7c8099" style={{ fontSize: '2px', fontWeight: 700, letterSpacing: '0.1px' }}>
-                                  INVESTED
-                                </text>
-                              </g>
-                            </svg>
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxWidth: 160 }}>
-                            {sectorSegments.map((seg, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, display: 'inline-block' }} />
-                                <span style={{ color: tc, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: 90 }}>
-                                  {seg.category}
-                                </span>
-                                <span style={{ color: '#7c8099', fontWeight: 700 }}>
-                                  {seg.percentage.toFixed(0)}%
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
+                        )}
                       </Card>
                     </Col>
 
@@ -1819,47 +2001,91 @@ export default function InvestorDashboard() {
                           <Title level={5} style={{ color: tc, fontFamily: 'Outfit', fontWeight: 700, margin: 0, fontSize: 14 }}>
                             📈 Portfolio Valuation Trajectory
                           </Title>
-                          <Tag color="green" style={{ fontWeight: 700 }}>+15.2% ROI</Tag>
+                          {myInvestments.length > 0 && (
+                            <Tag 
+                              color={trajectoryData.roi >= 0 ? "green" : "red"} 
+                              style={{ fontWeight: 700 }}
+                            >
+                              {trajectoryData.roi >= 0 ? '+' : ''}{trajectoryData.roi.toFixed(1)}% ROI
+                            </Tag>
+                          )}
                         </div>
-                        <div style={{ padding: '0 8px' }}>
-                          <svg width="100%" height="120" viewBox="0 0 300 100" style={{ overflow: 'visible' }}>
-                            <defs>
-                              <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
-                                <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
-                              </linearGradient>
-                            </defs>
-                            {/* Grid lines */}
-                            <line x1="10" y1="15" x2="290" y2="15" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
-                            <line x1="10" y1="45" x2="290" y2="45" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
-                            <line x1="10" y1="75" x2="290" y2="75" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
-                            
-                            {/* Area Gradient fill */}
-                            <path d="M10 90 L10 80 L80 72 L150 48 L220 54 L290 15 L290 90 Z" fill="url(#valGrad)" />
-                            
-                            {/* Line path */}
-                            <path d="M10 80 L80 72 L150 48 L220 54 L290 15" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
-                            
-                            {/* Circle Markers */}
-                            <circle cx="10" cy="80" r="3" fill="#10b981" />
-                            <circle cx="80" cy="72" r="3" fill="#10b981" />
-                            <circle cx="150" cy="48" r="3" fill="#10b981" />
-                            <circle cx="220" cy="54" r="3" fill="#10b981" />
-                            <circle cx="290" cy="15" r="4.5" fill={isDarkMode ? '#111827' : '#fff'} stroke="#10b981" strokeWidth="2" />
-                            
-                            {/* Axis Labels */}
-                            <text x="10" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Mar</text>
-                            <text x="80" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Apr</text>
-                            <text x="150" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">May</text>
-                            <text x="220" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Jun</text>
-                            <text x="290" y="98" fill="#7c8099" style={{ fontSize: '7px', fontWeight: 600 }} textAnchor="middle">Jul</text>
-                          </svg>
-                        </div>
-                        <div style={{ textAlign: 'center', marginTop: 12 }}>
-                          <Text type="secondary" style={{ fontSize: 11 }}>
-                            Trailed performance tracking calculated based on startup valuation shifts.
-                          </Text>
-                        </div>
+                        {myInvestments.length === 0 ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 180, textAlign: 'center', padding: '0 16px' }}>
+                            <RiseOutlined style={{ fontSize: 36, color: '#00d09c', marginBottom: 12, opacity: 0.8 }} />
+                            <Text style={{ color: tc, fontWeight: 600, fontSize: 13, display: 'block', marginBottom: 4 }}>No Trajectory Data</Text>
+                            <Text type="secondary" style={{ fontSize: 11 }}>Performance tracking and ROI stats will be activated once you make your first pledge.</Text>
+                          </div>
+                        ) : (
+                          <>
+                            <div style={{ padding: '0 8px' }}>
+                              <svg width="100%" height="120" viewBox="0 0 300 100" style={{ overflow: 'visible' }}>
+                                <defs>
+                                  <linearGradient id="valGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity="0.25"/>
+                                    <stop offset="100%" stopColor="#10b981" stopOpacity="0.0"/>
+                                  </linearGradient>
+                                </defs>
+                                {/* Grid lines */}
+                                <line x1="10" y1="15" x2="290" y2="15" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                                <line x1="10" y1="45" x2="290" y2="45" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                                <line x1="10" y1="75" x2="290" y2="75" stroke={isDarkMode ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)'} strokeDasharray="3 3" />
+                                
+                                {/* Area Gradient fill */}
+                                <path d={areaPath} fill="url(#valGrad)" />
+                                
+                                {/* Line path */}
+                                <path d={linePath} fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" />
+                                
+                                {/* Circle Markers */}
+                                {svgPoints.slice(0, svgPoints.length - 1).map((p, idx) => (
+                                  <circle key={idx} cx={p.x} cy={p.y} r="3" fill="#10b981" />
+                                ))}
+                                {svgPoints.length > 0 && (
+                                  <>
+                                    <circle 
+                                      cx={svgPoints[svgPoints.length - 1].x} 
+                                      cy={svgPoints[svgPoints.length - 1].y} 
+                                      r="4.5" 
+                                      fill={isDarkMode ? '#111827' : '#fff'} 
+                                      stroke="#10b981" 
+                                      strokeWidth="2" 
+                                    />
+                                    {/* Valuation text label above the final point */}
+                                    <text 
+                                      x={svgPoints[svgPoints.length - 1].x} 
+                                      y={svgPoints[svgPoints.length - 1].y - 8} 
+                                      fill="#10b981" 
+                                      style={{ fontSize: '7px', fontWeight: 800 }} 
+                                      textAnchor="end"
+                                    >
+                                      ₹{svgPoints[svgPoints.length - 1].value.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                                    </text>
+                                  </>
+                                )}
+                                
+                                {/* Axis Labels */}
+                                {trajectoryData.months.map((month, idx) => (
+                                  <text 
+                                    key={idx} 
+                                    x={10 + 70 * idx} 
+                                    y="98" 
+                                    fill="#7c8099" 
+                                    style={{ fontSize: '7px', fontWeight: 600 }} 
+                                    textAnchor="middle"
+                                  >
+                                    {month}
+                                  </text>
+                                ))}
+                              </svg>
+                            </div>
+                            <div style={{ textAlign: 'center', marginTop: 12 }}>
+                              <Text type="secondary" style={{ fontSize: 11 }}>
+                                Trailed performance tracking calculated based on startup valuation shifts.
+                              </Text>
+                            </div>
+                          </>
+                        )}
                       </Card>
                     </Col>
                   </Row>
@@ -1867,7 +2093,7 @@ export default function InvestorDashboard() {
                   <Card>
                     <Title level={4} style={{ color: isDarkMode ? '#f1f5f9' : '#44475b', marginBottom: 20, fontFamily: 'Outfit', fontWeight: 700 }}>Investment Ledger &amp; Valuation History</Title>
                     <Table 
-                      dataSource={myInvestments} 
+                      dataSource={groupedHoldings} 
                       columns={portfolioColumns} 
                       pagination={{ pageSize: 5 }}
                       locale={{ emptyText: <span style={{ color: '#7c8099' }}>No holdings recorded. Go to Marketplace to invest.</span> }}
@@ -2364,9 +2590,35 @@ export default function InvestorDashboard() {
                     ) : (
                       <QrCodeView
                         countdown={countdown}
-                        onSimulateSuccess={() => {
-                          setWalletAmount(walletAmount);
-                          handleWalletTransaction();
+                        onSimulateSuccess={async () => {
+                          const token = localStorage.getItem('token');
+                          setProcessingWallet(true);
+                          setWalletStep(1);
+                          try {
+                            const res = await fetch(`${API_URL}/api/wallet/deposit`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              },
+                              body: JSON.stringify({ amount: walletAmount })
+                            });
+                            const data = await res.json();
+                            if (!res.ok) {
+                              throw new Error(data.error || 'Failed to complete direct deposit simulation');
+                            }
+                            setWalletStep(2);
+                            const updatedUser = { ...currentUser, walletBalance: data.updatedWalletBalance };
+                            localStorage.setItem('user', JSON.stringify(updatedUser));
+                            setCurrentUser(updatedUser);
+                            message.success('Simulated QR Payment successful and wallet credited!');
+                            fetchData();
+                          } catch (err) {
+                            message.error(`QR Payment Simulation Failed: ${err.message}`);
+                            setWalletStep(0);
+                          } finally {
+                            setProcessingWallet(false);
+                          }
                         }}
                       />
                     )}
@@ -2796,282 +3048,376 @@ export default function InvestorDashboard() {
             const raisedProgress = Math.min(100, Math.round(((s.raisedAmount || 0) / (s.targetGoal || 1)) * 100));
 
             return (
-              <Tabs defaultActiveKey="1" style={{ padding: '0 16px' }} items={[
-                {
-                  key: '1',
-                  label: <span style={{ fontWeight: 600 }}>Overview</span>,
-                  children: (
-                    <div style={{ padding: '8px 0' }}>
-                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Tagline</Text>
-                      <Paragraph style={{ color: tc, fontStyle: 'italic', fontSize: 13 }}>"{s.tagline}"</Paragraph>
-                      
-                      <Divider style={{ margin: '12px 0' }} />
-                      
-                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>What the Company Does</Text>
-                      <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#4b5563', fontSize: 13, lineHeight: 1.6 }}>
-                        {s.description || 'No detailed description available.'}
-                      </Paragraph>
-                      
-                      <Divider style={{ margin: '12px 0' }} />
-
-                      <Row gutter={[16, 16]}>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>FOUNDED YEAR</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>{s.foundedYear || 'N/A'}</Text>
-                        </Col>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LOCATION</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>{s.location || 'N/A'}</Text>
-                        </Col>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>STAGE</Text>
-                          <Tag color="cyan" style={{ fontWeight: 600, marginTop: 4 }}>{s.stage || 'Seed'}</Tag>
-                        </Col>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>TEAM SIZE</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>{s.teamSize || 'N/A'} Members</Text>
-                        </Col>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>WEBSITE</Text>
-                          {s.website ? (
-                            <a href={s.website} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
-                              {s.website.replace(/^https?:\/\/(www\.)?/, '')}
-                            </a>
-                          ) : 'N/A'}
-                        </Col>
-                        <Col span={12}>
-                          <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LINKEDIN</Text>
-                          {s.linkedIn ? (
-                            <a href={s.linkedIn} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
-                              LinkedIn Profile
-                            </a>
-                          ) : 'N/A'}
-                        </Col>
-                      </Row>
+              <>
+                {/* ── Holdings & Pledges Section (At the top) ── */}
+                {currentCompanyHoldings && currentCompanyHoldings.length > 0 && (
+                  <div style={{ 
+                    margin: '0 16px 20px 16px', 
+                    background: isDarkMode ? '#1e293b' : '#f8fafc', 
+                    border: `1px solid ${borderCl}`, 
+                    borderRadius: 12, 
+                    padding: 16 
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <Text style={{ color: tc, fontWeight: 800, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        💼 Your Holdings & Pledges ({currentCompanyHoldings.length})
+                      </Text>
+                      <Tag color="green" style={{ fontWeight: 700, borderRadius: 4 }}>
+                        ACTIVE HOLDING
+                      </Tag>
                     </div>
-                  )
-                },
-                {
-                  key: '2',
-                  label: <span style={{ fontWeight: 600 }}>Financials & Valuation</span>,
-                  children: (
-                    <div style={{ padding: '8px 0' }}>
-                      <Row gutter={[16, 16]}>
-                        <Col span={12}>
-                          <Statistic 
-                            title={<span style={{ color: '#7c8099', fontSize: 12 }}>VALUATION CAP</span>} 
-                            value={s.valuationCap} 
-                            formatter={(v) => `₹${Number(v).toLocaleString()}`}
-                            valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
-                          />
-                        </Col>
-                        <Col span={12}>
-                          <Statistic 
-                            title={<span style={{ color: '#7c8099', fontSize: 12 }}>MINIMUM INVESTMENT</span>} 
-                            value={s.minimumInvestment} 
-                            formatter={(v) => `₹${Number(v).toLocaleString()}`}
-                            valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
-                          />
-                        </Col>
-                      </Row>
-
-                      <Divider style={{ margin: '16px 0' }} />
-
-                      <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>VALUATION HISTORY &amp; PROJECTION</Text>
-                      {s.pastValuations && s.pastValuations.length > 1 ? (
-                        <div style={{ background: bgInner, padding: 16, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7' }}>
-                          {(() => {
-                            const currentVal = s.pastValuations[s.pastValuations.length - 1];
-                            const round1 = Math.round(currentVal * (1 + projectionGrowth / 100) * (projectionRetention / 100));
-                            const round2 = Math.round(round1 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
-                            const round3 = Math.round(round2 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
-                            const projectedValuations = [...s.pastValuations, round1, round2, round3];
+                    
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ borderBottom: `1px solid ${borderCl}` }}>
+                            <th style={{ padding: '6px 8px', textAlign: 'left', color: '#7c8099', fontWeight: 600 }}>Purchase Date</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', color: '#7c8099', fontWeight: 600 }}>Pledged Capital</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', color: '#7c8099', fontWeight: 600 }}>Est. Share Price</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'right', color: '#7c8099', fontWeight: 600 }}>Shares Owned</th>
+                            <th style={{ padding: '6px 8px', textAlign: 'center', color: '#7c8099', fontWeight: 600 }}>Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {currentCompanyHoldings.map((tx, idx) => {
+                            const startup = tx.startupObj || s;
+                            const valuations = [...(startup?.pastValuations || [])];
+                            if (valuations.length === 0 || valuations[valuations.length - 1] !== startup?.valuationCap) {
+                              if (startup?.valuationCap) {
+                                valuations.push(startup.valuationCap);
+                              }
+                            }
+                            
+                            let purchaseSharePrice = startup?.pricePerShare || 100;
+                            let shares = Math.round(tx.amount / purchaseSharePrice);
+                            
+                            if (valuations.length > 1) {
+                              const currentVal = valuations[valuations.length - 1] || 1;
+                              const txDate = tx.rawDate || new Date(tx.timestamp || tx.createdAt);
+                              const today = new Date();
+                              const diffMonths = (today.getFullYear() - txDate.getFullYear()) * 12 + today.getMonth() - txDate.getMonth();
+                              
+                              const valIdx = Math.max(0, valuations.length - 1 - Math.min(valuations.length - 1, diffMonths));
+                              const purchaseVal = valuations[valIdx] || currentVal;
+                              purchaseSharePrice = Math.round((startup?.pricePerShare || 100) * (purchaseVal / currentVal));
+                              shares = Math.round(tx.amount / purchaseSharePrice);
+                            }
+                            
                             return (
-                              <>
-                                <ValuationSparkline data={projectedValuations} projectionCount={3} />
-                                <div style={{ marginTop: 20, padding: '12px 16px', background: bgCard, borderRadius: 8, border: `1px solid ${borderCl}` }}>
-                                  <Text style={{ fontSize: 12, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
-                                    VALUATION PROJECTION SIMULATOR (SaaS Model)
-                                  </Text>
-                                  <div style={{ marginBottom: 12 }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                                      <Text type="secondary">Expected Annual Growth Rate</Text>
-                                      <Text style={{ color: '#00d09c', fontWeight: 600 }}>{projectionGrowth}%</Text>
-                                    </div>
-                                    <Slider 
-                                      min={0} 
-                                      max={100} 
-                                      value={projectionGrowth} 
-                                      onChange={(val) => setProjectionGrowth(val)} 
-                                      trackStyle={{ backgroundColor: '#00d09c' }}
-                                      handleStyle={{ borderColor: '#00d09c' }}
-                                    />
-                                  </div>
-                                  <div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                                      <Text type="secondary">Customer Retention Rate (Net Revenue Retention)</Text>
-                                      <Text style={{ color: '#ea580c', fontWeight: 600 }}>{projectionRetention}%</Text>
-                                    </div>
-                                    <Slider 
-                                      min={50} 
-                                      max={100} 
-                                      value={projectionRetention} 
-                                      onChange={(val) => setProjectionRetention(val)} 
-                                      trackStyle={{ backgroundColor: '#ea580c' }}
-                                      handleStyle={{ borderColor: '#ea580c' }}
-                                    />
-                                  </div>
-                                  <div style={{ marginTop: 8, fontSize: 10, color: '#7c8099', fontStyle: 'italic' }}>
-                                    *Estimations are computed using compounded net expansion metrics.
-                                  </div>
-                                </div>
-                              </>
+                              <tr key={tx.key || idx} style={{ borderBottom: idx !== currentCompanyHoldings.length - 1 ? `1px solid ${borderCl}` : 'none' }}>
+                                <td style={{ padding: '8px 8px', color: tc }}>
+                                  {new Date(tx.rawDate || tx.timestamp).toLocaleDateString()} at {new Date(tx.rawDate || tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td style={{ padding: '8px 8px', textAlign: 'right', fontWeight: 700, color: '#00d09c' }}>
+                                  ₹{tx.amount.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '8px 8px', textAlign: 'right', color: tc }}>
+                                  ₹{purchaseSharePrice.toLocaleString()}
+                                </td>
+                                <td style={{ padding: '8px 8px', textAlign: 'right', color: tc, fontWeight: 600 }}>
+                                  {shares.toLocaleString()} units
+                                </td>
+                                <td style={{ padding: '8px 8px', textAlign: 'center' }}>
+                                  <Button 
+                                    type="link" 
+                                    danger 
+                                    size="small" 
+                                    icon={<ArrowDownOutlined />}
+                                    onClick={async () => {
+                                      await handleSellInvestment(tx.key);
+                                      setCompanyDetailsVisible(false);
+                                    }}
+                                    style={{ padding: 0, fontSize: 11, fontWeight: 700 }}
+                                  >
+                                    Sell
+                                  </Button>
+                                </td>
+                              </tr>
                             );
-                          })()}
-                        </div>
-                      ) : (
-                        <Text type="secondary">No valuation history data available.</Text>
-                      )}
-
-                      <Divider style={{ margin: '16px 0' }} />
-
-                      <div style={{ marginBottom: 12 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
-                            ₹{(s.raisedAmount || 0).toLocaleString()} raised
-                          </Text>
-                          <Text style={{ color: tc, fontSize: 12, fontWeight: 600 }}>
-                            {raisedProgress}% of target (₹{(s.targetGoal || 0).toLocaleString()})
-                          </Text>
-                        </div>
-                        <Progress percent={raisedProgress} showInfo={false} strokeColor="#00d09c" strokeWidth={8} />
-                      </div>
-
-                      <Row gutter={[16, 16]} style={{ marginTop: 16, background: bgInner, padding: 12, borderRadius: 8 }}>
-                        <Col span={6}>
-                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>TRAILING REVENUE</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.trailingRevenue || 0).toLocaleString()}</Text>
-                        </Col>
-                        <Col span={6}>
-                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>EBITDA MARGIN</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>{s.ebitdaMargin || 0}%</Text>
-                        </Col>
-                        <Col span={6}>
-                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>BURN RATE</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.burnRate || 0).toLocaleString()}/mo</Text>
-                        </Col>
-                        <Col span={6}>
-                          <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>RUNWAY</Text>
-                          <Text style={{ color: tc, fontWeight: 600 }}>{s.runway || 0} Months</Text>
-                        </Col>
-                      </Row>
+                          })}
+                        </tbody>
+                      </table>
                     </div>
-                  )
-                },
-                {
-                  key: '3',
-                  label: <span style={{ fontWeight: 600 }}>Strategy & Model</span>,
-                  children: (
-                    <div style={{ padding: '8px 0', maxHeight: 350, overflowY: 'auto' }}>
-                      <div style={{ marginBottom: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>BUSINESS MODEL</Text>
-                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.businessModel || 'Direct B2B/B2C services and platform subscription models.'}</Paragraph>
+                  </div>
+                )}
+
+                <Tabs defaultActiveKey="1" style={{ padding: '0 16px' }} items={[
+                  {
+                    key: '1',
+                    label: <span style={{ fontWeight: 600 }}>Overview</span>,
+                    children: (
+                      <div style={{ padding: '8px 0' }}>
+                        <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Tagline</Text>
+                        <Paragraph style={{ color: tc, fontStyle: 'italic', fontSize: 13 }}>"{s.tagline}"</Paragraph>
+                        
+                        <Divider style={{ margin: '12px 0' }} />
+                        
+                        <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>What the Company Does</Text>
+                        <Paragraph style={{ color: isDarkMode ? '#cbd5e1' : '#4b5563', fontSize: 13, lineHeight: 1.6 }}>
+                          {s.description || 'No detailed description available.'}
+                        </Paragraph>
+                        
+                        <Divider style={{ margin: '12px 0' }} />
+
+                        <Row gutter={[16, 16]}>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>FOUNDED YEAR</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>{s.foundedYear || 'N/A'}</Text>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LOCATION</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>{s.location || 'N/A'}</Text>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>STAGE</Text>
+                            <Tag color="cyan" style={{ fontWeight: 600, marginTop: 4 }}>{s.stage || 'Seed'}</Tag>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>TEAM SIZE</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>{s.teamSize || 'N/A'} Members</Text>
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>WEBSITE</Text>
+                            {s.website ? (
+                              <a href={s.website} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
+                                {s.website.replace(/^https?:\/\/(www\.)?/, '')}
+                              </a>
+                            ) : 'N/A'}
+                          </Col>
+                          <Col span={12}>
+                            <Text type="secondary" style={{ fontSize: 11, display: 'block' }}>LINKEDIN</Text>
+                            {s.linkedIn ? (
+                              <a href={s.linkedIn} target="_blank" rel="noopener noreferrer" style={{ color: '#00d09c', fontWeight: 600 }}>
+                                LinkedIn Profile
+                              </a>
+                            ) : 'N/A'}
+                          </Col>
+                        </Row>
                       </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>MARKET OPPORTUNITY</Text>
-                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketOpportunity || 'Targeting emerging Indian consumer demographic & regional digital expansion.'}</Paragraph>
-                      </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>COMPETITIVE ADVANTAGE</Text>
-                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.competitiveAdvantage || 'Proprietary technology, first-mover advantage, and local supply chain lock-in.'}</Paragraph>
-                      </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>GO TO MARKET STRATEGY</Text>
-                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketingMixVariables || 'Standard marketing and offline channel distributions.'}</Paragraph>
-                      </div>
-                      <div style={{ marginBottom: 12 }}>
-                        <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>USE OF FUNDS</Text>
-                        <Paragraph style={{ color: tc, fontSize: 13 }}>{s.useOfFunds || s.financialProcurement || 'Engineering scaling, tier-1 city user acquisition, and operating runway.'}</Paragraph>
-                      </div>
-                    </div>
-                  )
-                },
-                {
-                  key: '4',
-                  label: <span style={{ fontWeight: 600 }}>Team & Founders</span>,
-                  children: (
-                    <div style={{ padding: '8px 0' }}>
-                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Founding Team</Text>
-                      <Row gutter={[16, 16]}>
-                        <Col span={12}>
-                          <Card size="small" style={{ borderRadius: 8, background: bgInner }}>
-                            <Card.Meta 
-                              avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#00d09c' }} />}
-                              title={<span style={{ color: tc }}>{s.founderName || 'Primary Founder'}</span>}
-                              description={<span style={{ color: '#7c8099' }}>Founder & CEO</span>}
+                    )
+                  },
+                  {
+                    key: '2',
+                    label: <span style={{ fontWeight: 600 }}>Financials & Valuation</span>,
+                    children: (
+                      <div style={{ padding: '8px 0' }}>
+                        <Row gutter={[16, 16]}>
+                          <Col span={12}>
+                            <Statistic 
+                              title={<span style={{ color: '#7c8099', fontSize: 12 }}>VALUATION CAP</span>} 
+                              value={s.valuationCap} 
+                              formatter={(v) => `₹${Number(v).toLocaleString()}`}
+                              valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
                             />
-                          </Card>
-                        </Col>
-                        {s.coFounders && (
+                          </Col>
+                          <Col span={12}>
+                            <Statistic 
+                              title={<span style={{ color: '#7c8099', fontSize: 12 }}>MINIMUM INVESTMENT</span>} 
+                              value={s.minimumInvestment} 
+                              formatter={(v) => `₹${Number(v).toLocaleString()}`}
+                              valueStyle={{ color: tc, fontSize: 18, fontWeight: 800 }}
+                            />
+                          </Col>
+                        </Row>
+
+                        <Divider style={{ margin: '16px 0' }} />
+
+                        <Text style={{ fontSize: 13, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>VALUATION HISTORY &amp; PROJECTION</Text>
+                        {s.pastValuations && s.pastValuations.length > 1 ? (
+                          <div style={{ background: bgInner, padding: 16, borderRadius: 12, border: isDarkMode ? '1px solid #1f2937' : '1px solid #edf2f7' }}>
+                            {(() => {
+                              const currentVal = s.pastValuations[s.pastValuations.length - 1];
+                              const round1 = Math.round(currentVal * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                              const round2 = Math.round(round1 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                              const round3 = Math.round(round2 * (1 + projectionGrowth / 100) * (projectionRetention / 100));
+                              const projectedValuations = [...s.pastValuations, round1, round2, round3];
+                              return (
+                                <>
+                                  <ValuationSparkline data={projectedValuations} projectionCount={3} />
+                                  <div style={{ marginTop: 20, padding: '12px 16px', background: bgCard, borderRadius: 8, border: `1px solid ${borderCl}` }}>
+                                    <Text style={{ fontSize: 12, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
+                                      VALUATION PROJECTION SIMULATOR (SaaS Model)
+                                    </Text>
+                                    <div style={{ marginBottom: 12 }}>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                                        <Text type="secondary">Expected Annual Growth Rate</Text>
+                                        <Text style={{ color: '#00d09c', fontWeight: 600 }}>{projectionGrowth}%</Text>
+                                      </div>
+                                      <Slider 
+                                        min={0} 
+                                        max={100} 
+                                        value={projectionGrowth} 
+                                        onChange={(val) => setProjectionGrowth(val)} 
+                                        trackStyle={{ backgroundColor: '#00d09c' }}
+                                        handleStyle={{ borderColor: '#00d09c' }}
+                                      />
+                                    </div>
+                                    <div>
+                                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                                        <Text type="secondary">Customer Retention Rate (Net Revenue Retention)</Text>
+                                        <Text style={{ color: '#ea580c', fontWeight: 600 }}>{projectionRetention}%</Text>
+                                      </div>
+                                      <Slider 
+                                        min={50} 
+                                        max={100} 
+                                        value={projectionRetention} 
+                                        onChange={(val) => setProjectionRetention(val)} 
+                                        trackStyle={{ backgroundColor: '#ea580c' }}
+                                        handleStyle={{ borderColor: '#ea580c' }}
+                                      />
+                                    </div>
+                                    <div style={{ marginTop: 8, fontSize: 10, color: '#7c8099', fontStyle: 'italic' }}>
+                                      *Estimations are computed using compounded net expansion metrics.
+                                    </div>
+                                  </div>
+                                </>
+                              );
+                            })()}
+                          </div>
+                        ) : (
+                          <Text type="secondary">No valuation history data available.</Text>
+                        )}
+
+                        <Divider style={{ margin: '16px 0' }} />
+
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={{ color: '#00d09c', fontSize: 13, fontWeight: 700 }}>
+                              ₹{(s.raisedAmount || 0).toLocaleString()} raised
+                            </Text>
+                            <Text style={{ color: tc, fontSize: 12, fontWeight: 600 }}>
+                              {raisedProgress}% of target (₹{(s.targetGoal || 0).toLocaleString()})
+                            </Text>
+                          </div>
+                          <Progress percent={raisedProgress} showInfo={false} strokeColor="#00d09c" strokeWidth={8} />
+                        </div>
+
+                        <Row gutter={[16, 16]} style={{ marginTop: 16, background: bgInner, padding: 12, borderRadius: 8 }}>
+                          <Col span={6}>
+                            <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>TRAILING REVENUE</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.trailingRevenue || 0).toLocaleString()}</Text>
+                          </Col>
+                          <Col span={6}>
+                            <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>EBITDA MARGIN</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>{s.ebitdaMargin || 0}%</Text>
+                          </Col>
+                          <Col span={6}>
+                            <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>BURN RATE</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>₹{(s.burnRate || 0).toLocaleString()}/mo</Text>
+                          </Col>
+                          <Col span={6}>
+                            <Text type="secondary" style={{ fontSize: 10, display: 'block' }}>RUNWAY</Text>
+                            <Text style={{ color: tc, fontWeight: 600 }}>{s.runway || 0} Months</Text>
+                          </Col>
+                        </Row>
+                      </div>
+                    )
+                  },
+                  {
+                    key: '3',
+                    label: <span style={{ fontWeight: 600 }}>Strategy & Model</span>,
+                    children: (
+                      <div style={{ padding: '8px 0', maxHeight: 350, overflowY: 'auto' }}>
+                        <div style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>BUSINESS MODEL</Text>
+                          <Paragraph style={{ color: tc, fontSize: 13 }}>{s.businessModel || 'Direct B2B/B2C services and platform subscription models.'}</Paragraph>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>MARKET OPPORTUNITY</Text>
+                          <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketOpportunity || 'Targeting emerging Indian consumer demographic & regional digital expansion.'}</Paragraph>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>COMPETITIVE ADVANTAGE</Text>
+                          <Paragraph style={{ color: tc, fontSize: 13 }}>{s.competitiveAdvantage || 'Proprietary technology, first-mover advantage, and local supply chain lock-in.'}</Paragraph>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>GO TO MARKET STRATEGY</Text>
+                          <Paragraph style={{ color: tc, fontSize: 13 }}>{s.marketingMixVariables || 'Standard marketing and offline channel distributions.'}</Paragraph>
+                        </div>
+                        <div style={{ marginBottom: 12 }}>
+                          <Text style={{ fontSize: 12, fontWeight: 700, color: '#00d09c', display: 'block', marginBottom: 2 }}>USE OF FUNDS</Text>
+                          <Paragraph style={{ color: tc, fontSize: 13 }}>{s.useOfFunds || s.financialProcurement || 'Engineering scaling, tier-1 city user acquisition, and operating runway.'}</Paragraph>
+                        </div>
+                      </div>
+                    )
+                  },
+                  {
+                    key: '4',
+                    label: <span style={{ fontWeight: 600 }}>Team & Founders</span>,
+                    children: (
+                      <div style={{ padding: '8px 0' }}>
+                        <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 8 }}>Founding Team</Text>
+                        <Row gutter={[16, 16]}>
                           <Col span={12}>
                             <Card size="small" style={{ borderRadius: 8, background: bgInner }}>
                               <Card.Meta 
-                                avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#10b981' }} />}
-                                title={<span style={{ color: tc }}>{s.coFounders}</span>}
-                                description={<span style={{ color: '#7c8099' }}>Co-Founder</span>}
+                                avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#00d09c' }} />}
+                                title={<span style={{ color: tc }}>{s.founderName || 'Primary Founder'}</span>}
+                                description={<span style={{ color: '#7c8099' }}>Founder & CEO</span>}
                               />
                             </Card>
                           </Col>
-                        )}
-                      </Row>
-                    </div>
-                  )
-                },
-                {
-                  key: '5',
-                  label: <span style={{ fontWeight: 600 }}>Past Investors & Backers</span>,
-                  children: (
-                    <div style={{ padding: '8px 0' }}>
-                      <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
-                        Funding Rounds & Investment History
-                      </Text>
-                      <Table 
-                        dataSource={investments} 
-                        columns={[
-                          {
-                            title: 'Investor/Backer',
-                            dataIndex: 'investorName',
-                            key: 'investorName',
-                            render: (text) => <Text style={{ color: tc, fontWeight: 600 }}>{text}</Text>
-                          },
-                          {
-                            title: 'Amount Invested',
-                            dataIndex: 'amount',
-                            key: 'amount',
-                            render: (amt) => <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{amt.toLocaleString()}</Text>
-                          },
-                          {
-                            title: 'Date',
-                            dataIndex: 'date',
-                            key: 'date',
-                            render: (date) => <Text style={{ color: '#7c8099' }}>{new Date(date).toLocaleDateString()}</Text>
-                          },
-                          {
-                            title: 'Type',
-                            dataIndex: 'type',
-                            key: 'type',
-                            render: (type) => <Tag color={type.includes('Lead') ? 'purple' : type.includes('Accelerator') ? 'blue' : 'orange'}>{type}</Tag>
-                          }
-                        ]}
-                        pagination={{ pageSize: 5 }}
-                        size="small"
-                        rowKey={(record, index) => index}
-                        locale={{ emptyText: 'No past backing history found.' }}
-                      />
-                    </div>
-                  )
-                }
-              ]} />
+                          {s.coFounders && (
+                            <Col span={12}>
+                              <Card size="small" style={{ borderRadius: 8, background: bgInner }}>
+                                <Card.Meta 
+                                  avatar={<Avatar icon={<UserOutlined />} style={{ backgroundColor: '#10b981' }} />}
+                                  title={<span style={{ color: tc }}>{s.coFounders}</span>}
+                                  description={<span style={{ color: '#7c8099' }}>Co-Founder</span>}
+                                />
+                              </Card>
+                            </Col>
+                          )}
+                        </Row>
+                      </div>
+                    )
+                  },
+                  {
+                    key: '5',
+                    label: <span style={{ fontWeight: 600 }}>Past Investors & Backers</span>,
+                    children: (
+                      <div style={{ padding: '8px 0' }}>
+                        <Text style={{ fontSize: 14, fontWeight: 700, color: tc, display: 'block', marginBottom: 12 }}>
+                          Funding Rounds & Investment History
+                        </Text>
+                        <Table 
+                          dataSource={investments} 
+                          columns={[
+                            {
+                              title: 'Investor/Backer',
+                              dataIndex: 'investorName',
+                              key: 'investorName',
+                              render: (text) => <Text style={{ color: tc, fontWeight: 600 }}>{text}</Text>
+                            },
+                            {
+                              title: 'Amount Invested',
+                              dataIndex: 'amount',
+                              key: 'amount',
+                              render: (amt) => <Text style={{ color: '#00d09c', fontWeight: 700 }}>₹{amt.toLocaleString()}</Text>
+                            },
+                            {
+                              title: 'Date',
+                              dataIndex: 'date',
+                              key: 'date',
+                              render: (date) => <Text style={{ color: '#7c8099' }}>{new Date(date).toLocaleDateString()}</Text>
+                            },
+                            {
+                              title: 'Type',
+                              dataIndex: 'type',
+                              key: 'type',
+                              render: (type) => <Tag color={type.includes('Lead') ? 'purple' : type.includes('Accelerator') ? 'blue' : 'orange'}>{type}</Tag>
+                            }
+                          ]}
+                          pagination={{ pageSize: 5 }}
+                          size="small"
+                          rowKey={(record, index) => index}
+                          locale={{ emptyText: 'No past backing history found.' }}
+                        />
+                      </div>
+                    )
+                  }
+                ]} />
+              </>
             );
           })()
         ) : (
