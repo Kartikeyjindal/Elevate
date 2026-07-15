@@ -2841,9 +2841,7 @@ export default function InvestorDashboard() {
                       const sipMult = (sipFV / calcPrincipal).toFixed(2);
 
                       // SVG Chart height scaling helper
-                      const maxVal = Math.max(oneTimeFV, sipFV, calcPrincipal * 2);
-                      const minVal = calcPrincipal;
-                      const range = maxVal - minVal || 1;
+                      const maxVal = Math.max(oneTimeFV, sipFV, calcPrincipal * 2) || 1;
 
                       // Generate points for the growth over time
                       const oneTimePoints = [];
@@ -2866,8 +2864,8 @@ export default function InvestorDashboard() {
                         }
                         
                         const x = 20 + (i / stepsCount) * 260;
-                        const yOt = 120 - ((otVal - minVal) / range) * 80;
-                        const ySip = 120 - ((sVal - minVal) / range) * 80;
+                        const yOt = 120 - (otVal / maxVal) * 90;
+                        const ySip = 120 - (sVal / maxVal) * 90;
                         
                         oneTimePoints.push(`${x},${yOt}`);
                         sipPoints.push(`${x},${ySip}`);
@@ -3031,9 +3029,10 @@ export default function InvestorDashboard() {
                                 />
 
                                 {/* Start and End Markers */}
-                                <circle cx="20" cy="120" r="3" fill="#6b7280" />
-                                <circle cx="280" cy={120 - ((oneTimeFV - minVal) / range) * 80} r="4.5" fill="#00d09c" stroke="#fff" strokeWidth="1.5" />
-                                <circle cx="280" cy={120 - ((sipFV - minVal) / range) * 80} r="4.5" fill="#8b5cf6" stroke="#fff" strokeWidth="1.5" />
+                                <circle cx="20" cy={120 - (calcPrincipal / maxVal) * 90} r="3" fill="#00d09c" />
+                                <circle cx="20" cy={120} r="3" fill="#8b5cf6" />
+                                <circle cx="280" cy={120 - (oneTimeFV / maxVal) * 90} r="4.5" fill="#00d09c" stroke="#fff" strokeWidth="1.5" />
+                                <circle cx="280" cy={120 - (sipFV / maxVal) * 90} r="4.5" fill="#8b5cf6" stroke="#fff" strokeWidth="1.5" />
 
                                 {/* X-axis labels */}
                                 <text x="20" y="132" fill="#7c8099" style={{ fontSize: '9px', fontWeight: 600 }} textAnchor="middle">Today</text>
