@@ -706,7 +706,7 @@ router.post('/baskets/invest', verifyToken, async (req, res) => {
     basket.constituents.forEach(item => {
       const match = allStartups.find(s => s.name.toLowerCase() === item.name.toLowerCase());
       if (match) {
-        const constituentsToInvest.push({
+        constituentsToInvest.push({
           startup: match,
           weight: item.weight
         });
