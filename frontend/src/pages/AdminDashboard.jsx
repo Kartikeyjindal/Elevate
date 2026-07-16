@@ -91,6 +91,346 @@ function ValuationGraph({ data }) {
   );
 }
 
+// Custom SVG Line Chart for Analytics
+function AnalyticsLineChart({ data, isDarkMode }) {
+  if (!data || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+
+  const width = 500;
+  const height = 220;
+  const padding = { left: 60, right: 20, top: 20, bottom: 40 };
+
+  const maxVal = Math.max(...data.map(d => d.amount)) || 1;
+  const minVal = 0;
+  const range = maxVal - minVal;
+
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const points = data.map((d, idx) => {
+    const x = padding.left + (idx / (data.length - 1 || 1)) * chartWidth;
+    const y = padding.top + chartHeight - ((d.amount - minVal) / range) * chartHeight;
+    return { x, y, label: d.label, val: d.amount };
+  });
+
+  const pathData = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+  const areaData = `${pathData} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+
+  const gradId = "analytics-line-grad";
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} style={{ overflow: 'visible' }}>
+        <defs>
+          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#00d09c" stopOpacity="0.25" />
+            <stop offset="100%" stopColor="#00d09c" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {[0, 0.25, 0.5, 0.75, 1].map((r, i) => {
+          const y = padding.top + r * chartHeight;
+          const gridVal = maxVal - r * range;
+          return (
+            <g key={i}>
+              <line 
+                x1={padding.left} 
+                y1={y} 
+                x2={width - padding.right} 
+                y2={y} 
+                stroke={isDarkMode ? '#334155' : '#e2e8f0'} 
+                strokeDasharray="4 4" 
+              />
+              <text 
+                x={padding.left - 8} 
+                y={y + 4} 
+                textAnchor="end" 
+                fill="#94a3b8" 
+                style={{ fontSize: '10px', fontWeight: 600 }}
+              >
+                ₹{(gridVal / 100000).toFixed(1)}L
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Area under the line */}
+        <path d={areaData} fill={`url(#${gradId})`} />
+
+        {/* Main path */}
+        <path 
+          d={pathData} 
+          fill="none" 
+          stroke="#00d09c" 
+          strokeWidth="3" 
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* X Axis Labels */}
+        {points.map((p, idx) => (
+          <text 
+            key={idx} 
+            x={p.x} 
+            y={padding.top + chartHeight + 20} 
+            textAnchor="middle" 
+            fill="#94a3b8" 
+            style={{ fontSize: '9px', fontWeight: 700 }}
+          >
+            {p.label}
+          </text>
+        ))}
+
+        {/* Hover dots & interaction rings */}
+        {points.map((p, idx) => (
+          <g key={idx}
+             onMouseEnter={() => setHoveredPoint(p)}
+             onMouseLeave={() => setHoveredPoint(null)}
+             style={{ cursor: 'pointer' }}
+          >
+            <circle 
+              cx={p.x} 
+              cy={p.y} 
+              r="12" 
+              fill="transparent" 
+            />
+            <circle 
+              cx={p.x} 
+              cy={p.y} 
+              r={hoveredPoint && hoveredPoint.x === p.x ? 6.5 : 4} 
+              fill="#00d09c" 
+              stroke="#fff" 
+              strokeWidth={hoveredPoint && hoveredPoint.x === p.x ? 2.5 : 1.5} 
+              style={{ transition: 'all 0.15s ease' }}
+            />
+          </g>
+        ))}
+      </svg>
+
+      {/* Floating HTML Tooltip */}
+      {hoveredPoint && (
+        <div style={{
+          position: 'absolute',
+          left: `${(hoveredPoint.x / width) * 100}%`,
+          top: `${(hoveredPoint.y / height) * 100 - 25}%`,
+          transform: 'translate(-50%, -100%)',
+          background: '#1e293b',
+          color: '#fff',
+          padding: '6px 12px',
+          borderRadius: 6,
+          fontSize: 11,
+          fontWeight: 700,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          pointerEvents: 'none',
+          zIndex: 10,
+          whiteSpace: 'nowrap',
+          border: '1px solid #334155'
+        }}>
+          <div style={{ color: '#94a3b8', fontSize: 9 }}>{hoveredPoint.label} Volume</div>
+          <div>₹{hoveredPoint.val.toLocaleString()}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Custom Horizontal Bar Chart
+function AnalyticsBarChart({ data, isDarkMode, C }) {
+  if (!data || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+
+  const maxVal = Math.max(...data.map(d => d.raisedAmount)) || 1;
+  const [hoveredBar, setHoveredBar] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '10px 0' }}>
+      {data.map((item, idx) => {
+        const pct = Math.min((item.raisedAmount / (item.targetGoal || 1)) * 100, 100);
+        const barPct = (item.raisedAmount / maxVal) * 100;
+        
+        return (
+          <div 
+            key={item._id || idx}
+            onMouseEnter={() => setHoveredBar(item)}
+            onMouseLeave={() => setHoveredBar(null)}
+            style={{ position: 'relative', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, fontWeight: 700 }}>
+              <Text style={{ color: C.text }}>{item.name}</Text>
+              <Text style={{ color: '#00d09c' }}>₹{item.raisedAmount.toLocaleString()} <span style={{ color: C.textSec, fontWeight: 500 }}>({pct.toFixed(0)}%)</span></Text>
+            </div>
+
+            {/* Progress track */}
+            <div style={{
+              height: 10,
+              width: '100%',
+              background: isDarkMode ? '#1e293b' : '#f1f5f9',
+              borderRadius: 5,
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                height: '100%',
+                width: `${barPct}%`,
+                background: 'linear-gradient(90deg, #00d09c 0%, #05b184 100%)',
+                borderRadius: 5,
+                transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+              }} />
+            </div>
+
+            {/* Tooltip on hover */}
+            {hoveredBar && hoveredBar._id === item._id && (
+              <div style={{
+                position: 'absolute',
+                right: 0,
+                top: -30,
+                background: '#1e293b',
+                color: '#fff',
+                padding: '4px 8px',
+                borderRadius: 4,
+                fontSize: 10,
+                fontWeight: 600,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                zIndex: 5
+              }}>
+                Target: ₹{item.targetGoal.toLocaleString()} ({item.category})
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Custom SVG Donut Chart
+function AnalyticsDonutChart({ data, isDarkMode, C }) {
+  if (!data || data.length === 0) return <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+
+  const total = data.reduce((sum, d) => sum + d.count, 0);
+  const radius = 55;
+  const circumference = 2 * Math.PI * radius; // 345.57
+  let accumulatedPercent = 0;
+
+  const colors = [
+    '#00d09c', // Teal
+    '#3b82f6', // Blue
+    '#8b5cf6', // Purple
+    '#f59e0b', // Amber
+    '#ec4899', // Pink
+    '#ef4444', // Red
+    '#10b981', // Emerald
+    '#6366f1'  // Indigo
+  ];
+
+  const segments = data.map((d, idx) => {
+    const percent = d.count / total;
+    const strokeDashoffset = circumference - (percent * circumference);
+    const strokeDasharray = `${circumference} ${circumference}`;
+    const rotation = accumulatedPercent * 360;
+    accumulatedPercent += percent;
+
+    return {
+      category: d.category,
+      count: d.count,
+      percent,
+      color: colors[idx % colors.length],
+      strokeDashoffset,
+      strokeDasharray,
+      rotation
+    };
+  });
+
+  const [hoveredSegment, setHoveredSegment] = useState(null);
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+      <div style={{ position: 'relative', width: 160, height: 160 }}>
+        <svg width="160" height="160" viewBox="0 0 160 160" style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}>
+          <circle 
+            cx="80" 
+            cy="80" 
+            r={radius} 
+            fill="transparent" 
+            stroke={isDarkMode ? '#1e293b' : '#f1f5f9'} 
+            strokeWidth="20" 
+          />
+          {segments.map((seg, idx) => (
+            <circle
+              key={idx}
+              cx="80"
+              cy="80"
+              r={radius}
+              fill="transparent"
+              stroke={seg.color}
+              strokeWidth="20"
+              strokeDasharray={seg.strokeDasharray}
+              strokeDashoffset={seg.strokeDashoffset}
+              style={{
+                transform: `rotate(${seg.rotation}deg)`,
+                transformOrigin: '80px 80px',
+                transition: 'all 0.3s ease',
+                cursor: 'pointer'
+              }}
+              onMouseEnter={() => setHoveredSegment(seg)}
+              onMouseLeave={() => setHoveredSegment(null)}
+            />
+          ))}
+        </svg>
+
+        {/* Central content */}
+        <div style={{
+          position: 'absolute',
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          pointerEvents: 'none'
+        }}>
+          {hoveredSegment ? (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 800, color: hoveredSegment.color, fontFamily: 'Outfit' }}>
+                {hoveredSegment.count}
+              </div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.textSec, textTransform: 'uppercase', maxWidth: 85, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {hoveredSegment.category}
+              </div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 18, fontWeight: 800, color: C.text, fontFamily: 'Outfit' }}>
+                {total}
+              </div>
+              <div style={{ fontSize: 9, fontWeight: 700, color: C.textSec, textTransform: 'uppercase' }}>
+                Total approved
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, maxHeight: 160, overflowY: 'auto' }}>
+        {segments.map((seg, idx) => (
+          <div 
+            key={idx} 
+            style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 600, color: C.textSec }}
+            onMouseEnter={() => setHoveredSegment(seg)}
+            onMouseLeave={() => setHoveredSegment(null)}
+          >
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: seg.color, flexShrink: 0 }} />
+            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 100, color: hoveredSegment && hoveredSegment.category === seg.category ? C.text : C.textSec }}>
+              {seg.category}
+            </div>
+            <div style={{ marginLeft: 'auto', fontWeight: 800, color: C.text }}>
+              {seg.count}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [allStartups, setAllStartups] = useState([]);
@@ -113,6 +453,11 @@ export default function AdminDashboard() {
   const [companyQuery, setCompanyQuery] = useState('');
   const [companyData, setCompanyData] = useState(null);
   const [searchingCompany, setSearchingCompany] = useState(false);
+
+  // Platform Analytics State
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [analyticsDateRange, setAnalyticsDateRange] = useState('all'); // all, 6m, 30d
 
   const handleUserSearch = async () => {
     if (!userQuery.trim()) {
@@ -257,6 +602,34 @@ export default function AdminDashboard() {
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
+
+  const fetchAnalyticsData = useCallback(async () => {
+    setLoadingAnalytics(true);
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_URL}/api/admin/analytics`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setAnalyticsData(data);
+      } else {
+        message.error('Failed to load platform analytics');
+      }
+    } catch (err) {
+      console.error(err);
+      message.error('Error fetching analytics data');
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeMenu === 'Platform Analytics') {
+      fetchAnalyticsData();
+    }
+  }, [activeMenu, fetchAnalyticsData]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem('token');
@@ -569,6 +942,202 @@ export default function AdminDashboard() {
   const detailInvestments = selectedStartupDetails?.investments || [];
   const detailValuations = detailStartup?.pastValuations || [];
   const detailLatestVal = detailValuations.length > 0 ? detailValuations[detailValuations.length - 1] : 0;
+
+  const getFilteredTrends = () => {
+    if (!analyticsData || !analyticsData.investmentTrends) return [];
+    const trends = analyticsData.investmentTrends;
+    if (analyticsDateRange === '6m') {
+      return trends.slice(-6);
+    }
+    if (analyticsDateRange === '30d') {
+      return trends.slice(-2); // Show last 2 months for monthly granularity
+    }
+    return trends;
+  };
+
+  const exportAnalyticsCSV = () => {
+    if (!analyticsData) return;
+    const { summary } = analyticsData;
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Metric,Value\n";
+    csvContent += `Total Platform Volume,₹${summary.totalPlatformVolume.toLocaleString()}\n`;
+    csvContent += `Total Registered Users,${summary.totalUsersCount}\n`;
+    csvContent += `Investors Count,${summary.investorUsersCount}\n`;
+    csvContent += `Company Founders Count,${summary.companyUsersCount}\n`;
+    csvContent += `Total Investments Placed,${summary.totalInvestmentsCount}\n`;
+    csvContent += `Average Investment Size,₹${summary.averageInvestmentSize.toLocaleString()}\n`;
+    csvContent += `Total Listed Startups,${summary.totalStartupsCount}\n`;
+    csvContent += `Approved Startups,${summary.approvedStartupsCount}\n`;
+    csvContent += `Pending Startups Review,${summary.pendingStartupsCount}\n`;
+    csvContent += `Rejected Startups,${summary.rejectedStartupsCount}\n`;
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `platform_analytics_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    message.success("CSV report downloaded successfully!");
+  };
+
+  const renderAnalyticsContent = () => {
+    if (loadingAnalytics) {
+      return (
+        <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, textAlign: 'center', padding: '60px 0' }}>
+          <Progress percent={60} status="active" strokeColor="#00d09c" showInfo={false} style={{ maxWidth: 300, margin: '0 auto' }} />
+          <Text style={{ C, color: C.textSec, display: 'block', marginTop: 16, fontWeight: 600 }}>Assembling platform telemetry...</Text>
+        </Card>
+      );
+    }
+
+    if (!analyticsData) {
+      return (
+        <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, textAlign: 'center', padding: '40px 0' }}>
+          <Text style={{ color: C.textSec }}>Failed to retrieve platform analytics.</Text>
+        </Card>
+      );
+    }
+
+    const { summary, categoryDistribution, topFunded } = analyticsData;
+    const filteredTrends = getFilteredTrends();
+
+    return (
+      <div className="fade-in-section">
+        {/* Date Filter & Export Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <Space>
+            <Text style={{ color: C.text, fontWeight: 700, fontSize: 13 }}>FILTER RANGE:</Text>
+            <Select
+              value={analyticsDateRange}
+              onChange={setAnalyticsDateRange}
+              style={{ width: 150 }}
+              dropdownStyle={{ background: C.card }}
+            >
+              <Select.Option value="all">All Time</Select.Option>
+              <Select.Option value="6m">Last 6 Months</Select.Option>
+              <Select.Option value="30d">Last 30 Days</Select.Option>
+            </Select>
+          </Space>
+          <Button 
+            type="primary" 
+            icon={<DownloadOutlined />} 
+            onClick={exportAnalyticsCSV}
+            style={{ borderRadius: 8, backgroundColor: '#00d09c', borderColor: '#00d09c', fontWeight: 600 }}
+          >
+            Export Report (CSV)
+          </Button>
+        </div>
+
+        {/* Analytics Stats Grid */}
+        <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+          <Col xs={24} sm={12} md={6}>
+            <Card style={{ padding: '8px 12px', borderRadius: 12, background: C.card, border: `1px solid ${C.border}` }}>
+              <Statistic 
+                title={<span style={{ color: C.textSec, fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Total Platform Volume</span>}
+                value={`₹${summary.totalPlatformVolume.toLocaleString()}`}
+                valueStyle={{ color: '#00d09c', fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card style={{ padding: '8px 12px', borderRadius: 12, background: C.card, border: `1px solid ${C.border}` }}>
+              <Statistic 
+                title={<span style={{ color: C.textSec, fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Investor/Founder Accounts</span>}
+                value={`${summary.investorUsersCount} / ${summary.companyUsersCount}`}
+                valueStyle={{ color: C.text, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}
+                suffix={<span style={{ fontSize: 11, color: C.textSec }}>users</span>}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card style={{ padding: '8px 12px', borderRadius: 12, background: C.card, border: `1px solid ${C.border}` }}>
+              <Statistic 
+                title={<span style={{ color: C.textSec, fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Total Pledges Count</span>}
+                value={summary.totalInvestmentsCount}
+                valueStyle={{ color: C.text, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}
+              />
+            </Card>
+          </Col>
+          <Col xs={24} sm={12} md={6}>
+            <Card style={{ padding: '8px 12px', borderRadius: 12, background: C.card, border: `1px solid ${C.border}` }}>
+              <Statistic 
+                title={<span style={{ color: C.textSec, fontWeight: 600, fontSize: 11, textTransform: 'uppercase' }}>Avg Pledge Capital</span>}
+                value={`₹${summary.averageInvestmentSize.toLocaleString()}`}
+                valueStyle={{ color: C.text, fontSize: 18, fontFamily: 'Outfit', fontWeight: 800 }}
+              />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Charts Row */}
+        <Row gutter={[20, 20]} style={{ marginBottom: 24 }}>
+          {/* Line Chart */}
+          <Col xs={24} lg={12}>
+            <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text style={{ color: C.text, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', fontFamily: 'Outfit' }}>
+                  Funding Trend (Capital Raised Over Time)
+                </Text>
+              </div>
+              <AnalyticsLineChart data={filteredTrends} isDarkMode={isDarkMode} />
+            </Card>
+          </Col>
+
+          {/* Bar Chart */}
+          <Col xs={24} lg={12}>
+            <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text style={{ color: C.text, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', fontFamily: 'Outfit' }}>
+                  Top 5 Capital Backed Startups
+                </Text>
+              </div>
+              <AnalyticsBarChart data={topFunded} isDarkMode={isDarkMode} C={C} />
+            </Card>
+          </Col>
+        </Row>
+
+        {/* Donut Chart Row */}
+        <Row gutter={[20, 20]}>
+          <Col xs={24} md={12}>
+            <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text style={{ color: C.text, fontWeight: 800, fontSize: 14, textTransform: 'uppercase', fontFamily: 'Outfit' }}>
+                  Startup Industry Sector Distribution
+                </Text>
+              </div>
+              <AnalyticsDonutChart data={categoryDistribution} isDarkMode={isDarkMode} C={C} />
+            </Card>
+          </Col>
+          <Col xs={24} md={12}>
+            <Card style={{ borderRadius: 12, border: `1px solid ${C.border}`, background: C.card, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Statistic 
+                title={<span style={{ color: C.textSec, fontWeight: 600, fontSize: 12, textTransform: 'uppercase' }}>Campaign Status Breakdown</span>}
+                value={`${summary.approvedStartupsCount} Approved / ${summary.pendingStartupsCount} Pending / ${summary.rejectedStartupsCount} Rejected`}
+                valueStyle={{ color: C.text, fontSize: 15, fontWeight: 700 }}
+                formatter={(val) => val}
+              />
+              <Divider style={{ margin: '12px 0' }} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                  <Text style={{ color: C.textSec }}>Approved & Active Campaign Ratio:</Text>
+                  <Text style={{ color: '#00d09c', fontWeight: 800 }}>
+                    {summary.totalStartupsCount > 0 ? ((summary.approvedStartupsCount / summary.totalStartupsCount) * 100).toFixed(0) : 0}%
+                  </Text>
+                </div>
+                <Progress 
+                  percent={summary.totalStartupsCount > 0 ? Math.round((summary.approvedStartupsCount / summary.totalStartupsCount) * 100) : 0} 
+                  strokeColor="#00d09c" 
+                  showInfo={false} 
+                  style={{ margin: 0 }}
+                />
+              </div>
+            </Card>
+          </Col>
+        </Row>
+      </div>
+    );
+  };
 
   // Render Body based on Sider menu selection
   const renderMainContent = () => {
@@ -910,7 +1479,11 @@ export default function AdminDashboard() {
       );
     }
 
-    if (activeMenu !== 'Dashboard') {
+    if (activeMenu === 'Platform Analytics') {
+      return renderAnalyticsContent();
+    }
+
+    if (activeMenu !== 'Dashboard' && activeMenu !== 'Platform Analytics') {
       return (
         <Card style={{ borderRadius: 12, padding: '24px 0', textAlign: 'center' }}>
           <DatabaseOutlined style={{ fontSize: 48, color: '#94a3b8', marginBottom: 16 }} />
@@ -1141,7 +1714,8 @@ export default function AdminDashboard() {
             { name: 'Dashboard', icon: <AuditOutlined /> },
             { name: 'User Access', icon: <UserOutlined /> },
             { name: 'Company Access', icon: <DatabaseOutlined /> },
-            { name: 'Audit Logs', icon: <BookOutlined /> }
+            { name: 'Audit Logs', icon: <BookOutlined /> },
+            { name: 'Platform Analytics', icon: <LineChartOutlined /> }
           ].map(item => {
             const isSelected = activeMenu === item.name;
             return (
