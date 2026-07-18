@@ -117,44 +117,46 @@ The platform operates on a **strict 3-role model**:
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        CLIENT (Browser)                      │
-│                                                             │
-│   React 19 SPA  ──  React Router v6  ──  Ant Design 5      │
-│         │                                                   │
-│   Vite 8 (ESM bundler, tree-shaking, HMR)                  │
-└─────────────────────────┬───────────────────────────────────┘
-                          │  HTTPS / REST API
-                          ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    BACKEND (Express.js)                      │
-│                                                             │
-│   ┌──────────┐  ┌───────────┐  ┌──────────┐  ┌─────────┐  │
-│   │   Auth   │  │ Startups  │  │Investments│  │  Blogs  │  │
-│   │  Routes  │  │  Routes   │  │  Routes  │  │  Routes │  │
-│   └──────────┘  └───────────┘  └──────────┘  └─────────┘  │
-│                                                             │
-│   ┌─────────────────────────────────────────────────────┐  │
-│   │            Connection Guard Middleware               │  │
-│   │  (waits up to 3s for DB, returns 503 on failure)   │  │
-│   └─────────────────────────────────────────────────────┘  │
-│                                                             │
-│   ┌──────────────────────┐  ┌──────────────────────────┐   │
-│   │   MongoDB Atlas      │  │  In-Memory Mock Fallback  │   │
-│   │   (Primary DB)       │  │  (mockMongoose.js)        │   │
-│   │                      │◄─┤  Auto-activates if Atlas  │   │
-│   │  Mongoose ODM        │  │  is unreachable           │   │
-│   └──────────────────────┘  └──────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-          ┌───────────────────────────┐
-          │     External Services      │
-          │  • Razorpay (Payments)     │
-          │  • RSS Feeds (News)        │
-          │  • DNS / MX (Email check)  │
-          └───────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph CLIENT["🖥️ CLIENT — Browser"]
+        direction LR
+        A["React 19 SPA"] --- B["React Router v6"] --- C["Ant Design 5"]
+        D["Vite 8 — ESM bundler · Tree-shaking · HMR"]
+    end
+
+    CLIENT -->|"HTTPS / REST API"| BACKEND
+
+    subgraph BACKEND["⚙️ BACKEND — Express.js"]
+        direction TB
+        subgraph ROUTES["API Routes"]
+            direction LR
+            R1["Auth\nRoutes"]
+            R2["Startups\nRoutes"]
+            R3["Investments\nRoutes"]
+            R4["Blogs\nRoutes"]
+        end
+
+        MW["🛡️ Connection Guard Middleware\nWaits up to 3s for DB · Returns 503 on failure"]
+
+        subgraph DB["Database Layer"]
+            direction LR
+            MONGO["🍃 MongoDB Atlas\nPrimary DB\nMongoose ODM"]
+            MOCK["📦 In-Memory Mock\nmockMongoose.js\nAuto-activates if\nAtlas is unreachable"]
+        end
+
+        ROUTES --> MW --> DB
+        MOCK -->|fallback| MONGO
+    end
+
+    BACKEND --> EXT
+
+    subgraph EXT["🔗 External Services"]
+        direction LR
+        E1["💳 Razorpay\nPayments"]
+        E2["📰 RSS Feeds\nNews"]
+        E3["📧 DNS / MX\nEmail Validation"]
+    end
 ```
 
 ### Key Engineering Decisions
