@@ -29,8 +29,8 @@ router.patch('/startups/:id', verifyToken, isAdmin, async (req, res) => {
     const { status, rejectionReason } = req.body;
     const { id } = req.params;
 
-    if (!['approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ error: 'Status must be approved or rejected' });
+    if (!['approved', 'rejected', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'Status must be approved, rejected, or pending' });
     }
 
     if (status === 'rejected' && (!rejectionReason || !rejectionReason.trim())) {

@@ -774,6 +774,35 @@ async function seedDatabase() {
       console.log(`Database already has ${startupsCount} startups. Skipping startups seed.`);
     }
 
+    // Ensure krishna exists as a pending startup
+    const krishnaExists = await Startup.findOne({ name: 'krishna' });
+    if (!krishnaExists) {
+      const newKrishna = new Startup({
+        name: 'krishna',
+        category: 'General',
+        founderName: 'Krishna Dev',
+        status: 'pending',
+        marketingMixVariables: 'Product: General service. Price: Value based. Place: New Delhi. Promotion: Word of mouth.',
+        financialProcurement: 'Capital Budgeting: ₹250k. Supply Chain: Local logistics.',
+        pastValuations: [250000],
+        raisedAmount: 0,
+        tagline: 'General technology services and incubation',
+        logoUrl: 'https://images.unsplash.com/photo-1508614589041-895b88991e3e?auto=format&fit=crop&w=400&q=80',
+        minimumInvestment: 5000,
+        valuationCap: 250000,
+        targetGoal: 250000,
+        maxGoal: 500000,
+        pricePerShare: 10,
+        securityType: 'Common Stock',
+        totalInvestors: 0,
+        daysLeft: 60,
+        isPrimaryMarket: false,
+        createdAt: new Date('2026-07-20T10:00:00Z')
+      });
+      await newKrishna.save();
+      console.log('Seeded missing krishna startup.');
+    }
+
     // 5. Seed Expert Analyst Blogs if missing
     const blogsCount = await Blog.countDocuments();
     if (blogsCount === 0) {

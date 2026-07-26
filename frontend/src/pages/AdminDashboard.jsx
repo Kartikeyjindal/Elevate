@@ -775,28 +775,7 @@ export default function AdminDashboard() {
     if (decision === 'approved') {
       await executeReview(startupId, 'approved');
     } else if (decision === 'rejected') {
-      let reason = customReason || '';
-      Modal.confirm({
-        title: 'Reject Startup Application',
-        zIndex: 3000,
-        icon: <ExclamationCircleOutlined style={{ color: '#eb5757' }} />,
-        content: (
-          <div style={{ marginTop: 10 }}>
-            <Paragraph>Please enter the basis/reason for rejecting this application. This feedback will be visible to the company founder.</Paragraph>
-            <Input.TextArea
-              rows={4}
-              placeholder="e.g. Incomplete financial disclosures or unrealistic valuation cap..."
-              onChange={(e) => { reason = e.target.value; }}
-            />
-          </div>
-        ),
-        okText: 'Confirm Rejection',
-        okType: 'danger',
-        cancelText: 'Cancel',
-        onOk: async () => {
-          await executeReview(startupId, 'rejected', reason || 'Requirements not met.');
-        }
-      });
+      await executeReview(startupId, 'rejected', customReason || 'Venture requirements not met.');
     }
   };
 
