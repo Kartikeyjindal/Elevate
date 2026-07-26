@@ -1002,7 +1002,7 @@ export default function AdminDashboard() {
             <Button 
               type="primary" 
               icon={<CheckCircleOutlined />} 
-              onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'approved'); }}
+              onClick={() => handleReview(record, 'approved')}
               style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6, height: 32, fontSize: 13, whiteSpace: 'nowrap' }}
             >
               Approve
@@ -1011,7 +1011,7 @@ export default function AdminDashboard() {
               type="primary" 
               danger 
               icon={<CloseCircleOutlined />} 
-              onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'rejected'); }}
+              onClick={() => handleReview(record, 'rejected')}
               style={{ borderRadius: 6, height: 32, fontSize: 13, whiteSpace: 'nowrap' }}
             >
               Reject
@@ -2102,7 +2102,7 @@ export default function AdminDashboard() {
                   <Button 
                     type="primary" 
                     icon={<CheckCircleOutlined />} 
-                    onClick={(e) => { e?.stopPropagation?.(); handleReview(detailStartup, 'approved'); }}
+                    onClick={() => handleReview(detailStartup, 'approved')}
                     style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 8, height: 38 }}
                   >
                     Approve Application
@@ -2111,7 +2111,7 @@ export default function AdminDashboard() {
                     type="primary" 
                     danger 
                     icon={<CloseCircleOutlined />} 
-                    onClick={(e) => { e?.stopPropagation?.(); handleReview(detailStartup, 'rejected'); }}
+                    onClick={() => handleReview(detailStartup, 'rejected')}
                     style={{ borderRadius: 8, height: 38 }}
                   >
                     Reject Application
