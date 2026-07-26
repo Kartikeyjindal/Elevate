@@ -93,27 +93,30 @@ function ValuationGraph({ data }) {
 
 // Custom SVG Line Chart for Analytics
 function AnalyticsLineChart({ data, isDarkMode }) {
-  if (!data || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+  if (!data || !Array.isArray(data) || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+
+  const validData = data.filter(d => d && typeof d.amount === 'number' && !isNaN(d.amount));
+  if (validData.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
 
   const width = 500;
   const height = 220;
   const padding = { left: 60, right: 20, top: 20, bottom: 40 };
 
-  const maxVal = Math.max(...data.map(d => d.amount)) || 1;
+  const maxVal = Math.max(...validData.map(d => d.amount)) || 1;
   const minVal = 0;
-  const range = maxVal - minVal;
+  const range = maxVal - minVal || 1;
 
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  const points = data.map((d, idx) => {
-    const x = padding.left + (idx / (data.length - 1 || 1)) * chartWidth;
-    const y = padding.top + chartHeight - ((d.amount - minVal) / range) * chartHeight;
-    return { x, y, label: d.label, val: d.amount };
+  const points = validData.map((d, idx) => {
+    const x = padding.left + (idx / (validData.length - 1 || 1)) * chartWidth;
+    const y = padding.top + chartHeight - (((d.amount || 0) - minVal) / range) * chartHeight;
+    return { x, y, label: d.label || '', val: d.amount || 0 };
   });
 
   const pathData = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-  const areaData = `${pathData} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z`;
+  const areaData = points.length > 0 ? `${pathData} L ${points[points.length - 1].x} ${padding.top + chartHeight} L ${points[0].x} ${padding.top + chartHeight} Z` : '';
 
   const gradId = "analytics-line-grad";
   const [hoveredPoint, setHoveredPoint] = useState(null);
@@ -228,7 +231,7 @@ function AnalyticsLineChart({ data, isDarkMode }) {
           border: '1px solid #334155'
         }}>
           <div style={{ color: '#94a3b8', fontSize: 9 }}>{hoveredPoint.label} Volume</div>
-          <div>₹{hoveredPoint.val.toLocaleString()}</div>
+          <div>₹{(hoveredPoint.val || 0).toLocaleString()}</div>
         </div>
       )}
     </div>
@@ -237,16 +240,21 @@ function AnalyticsLineChart({ data, isDarkMode }) {
 
 // Custom Horizontal Bar Chart
 function AnalyticsBarChart({ data, isDarkMode, C }) {
-  if (!data || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+  if (!data || !Array.isArray(data) || data.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
 
-  const maxVal = Math.max(...data.map(d => d.raisedAmount)) || 1;
+  const validData = data.filter(d => d && typeof d.raisedAmount === 'number');
+  if (validData.length === 0) return <div style={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#7c8099' }}>No data available</div>;
+
+  const maxVal = Math.max(...validData.map(d => d.raisedAmount)) || 1;
   const [hoveredBar, setHoveredBar] = useState(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: '10px 0' }}>
-      {data.map((item, idx) => {
-        const pct = Math.min((item.raisedAmount / (item.targetGoal || 1)) * 100, 100);
-        const barPct = (item.raisedAmount / maxVal) * 100;
+      {validData.map((item, idx) => {
+        const amt = item.raisedAmount || 0;
+        const target = item.targetGoal || 1;
+        const pct = Math.min((amt / target) * 100, 100);
+        const barPct = (amt / maxVal) * 100;
         
         return (
           <div 
@@ -256,8 +264,8 @@ function AnalyticsBarChart({ data, isDarkMode, C }) {
             style={{ position: 'relative', cursor: 'pointer' }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4, fontWeight: 700 }}>
-              <Text style={{ color: C.text }}>{item.name}</Text>
-              <Text style={{ color: '#00d09c' }}>₹{item.raisedAmount.toLocaleString()} <span style={{ color: C.textSec, fontWeight: 500 }}>({pct.toFixed(0)}%)</span></Text>
+              <Text style={{ color: C.text }}>{item.name || 'Startup'}</Text>
+              <Text style={{ color: '#00d09c' }}>₹{amt.toLocaleString()} <span style={{ color: C.textSec, fontWeight: 500 }}>({pct.toFixed(0)}%)</span></Text>
             </div>
 
             {/* Progress track */}
@@ -292,7 +300,7 @@ function AnalyticsBarChart({ data, isDarkMode, C }) {
                 boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
                 zIndex: 5
               }}>
-                Target: ₹{item.targetGoal.toLocaleString()} ({item.category})
+                Target: ₹{(item.targetGoal || 0).toLocaleString()} ({item.category || 'N/A'})
               </div>
             )}
           </div>

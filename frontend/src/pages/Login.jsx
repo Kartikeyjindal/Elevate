@@ -67,11 +67,13 @@ export default function Login() {
       }
       if (!response.ok) throw new Error(data.error || 'Login failed');
 
+      const userObj = data.user || {};
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
+      localStorage.setItem('user', JSON.stringify(userObj));
 
-      if (data.user.role === 'admin') navigate('/admin');
-      else if (data.user.role === 'company') navigate('/company');
+      const userRole = userObj.role || 'investor';
+      if (userRole === 'admin') navigate('/admin');
+      else if (userRole === 'company') navigate('/company');
       else navigate('/investor');
     } catch (error) {
       setErrorMsg(error.message);

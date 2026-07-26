@@ -9,16 +9,89 @@ import AdminDashboard from './pages/AdminDashboard';
 import CompanyDashboard from './pages/CompanyDashboard';
 import StartupApplication from './pages/StartupApplication';
 
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Uncaught error in component:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: '#0b0f19',
+          color: '#f1f5f9',
+          fontFamily: '"Plus Jakarta Sans", "Outfit", sans-serif',
+          padding: 24,
+          textAlign: 'center'
+        }}>
+          <h2 style={{ fontSize: 24, fontWeight: 800, marginBottom: 12 }}>Session Initialization Error</h2>
+          <p style={{ color: '#94a3b8', maxWidth: 450, marginBottom: 24, fontSize: 14 }}>
+            {this.state.error?.message || 'An error occurred while loading your dashboard session.'}
+          </p>
+          <button
+            onClick={() => {
+              localStorage.clear();
+              window.location.href = '/login';
+            }}
+            style={{
+              padding: '12px 28px',
+              backgroundColor: '#00d09c',
+              border: 'none',
+              borderRadius: 8,
+              color: '#fff',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontSize: 15
+            }}
+          >
+            Re-login to Elevate
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Protected Route wrapper for role authentication
 function ProtectedRoute({ children, allowedRole }) {
   const token = localStorage.getItem('token');
   const userStr = localStorage.getItem('user');
 
-  if (!token || !userStr) {
+  if (!token || !userStr || userStr === 'undefined' || userStr === 'null') {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     return <Navigate to="/login" replace />;
   }
 
-  const user = JSON.parse(userStr);
+  let user = null;
+  try {
+    user = JSON.parse(userStr);
+  } catch (e) {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!user || typeof user !== 'object') {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    return <Navigate to="/login" replace />;
+  }
 
   if (allowedRole && user.role !== allowedRole) {
     if (user.role === 'admin') return <Navigate to="/admin" replace />;
@@ -26,7 +99,7 @@ function ProtectedRoute({ children, allowedRole }) {
     return <Navigate to="/investor" replace />;
   }
 
-  return children;
+  return <ErrorBoundary>{children}</ErrorBoundary>;
 }
 
 function App() {
