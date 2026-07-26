@@ -775,9 +775,9 @@ async function seedDatabase() {
     }
 
     // Ensure krishna exists as a pending startup
-    const krishnaExists = await Startup.findOne({ name: 'krishna' });
-    if (!krishnaExists) {
-      const newKrishna = new Startup({
+    let krishnaObj = await Startup.findOne({ name: 'krishna' });
+    if (!krishnaObj) {
+      krishnaObj = new Startup({
         name: 'krishna',
         category: 'General',
         founderName: 'Krishna Dev',
@@ -799,8 +799,13 @@ async function seedDatabase() {
         isPrimaryMarket: false,
         createdAt: new Date('2026-07-20T10:00:00Z')
       });
-      await newKrishna.save();
+      await krishnaObj.save();
       console.log('Seeded missing krishna startup.');
+    } else {
+      krishnaObj.status = 'pending';
+      krishnaObj.rejectionReason = '';
+      await krishnaObj.save();
+      console.log('Reset existing krishna startup to pending.');
     }
 
     // 5. Seed Expert Analyst Blogs if missing

@@ -1258,6 +1258,37 @@ export default function AdminDashboard() {
                     {new Date(ts).toLocaleDateString()} at {new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </Text>
                 )
+              },
+              {
+                title: 'ACTIONS',
+                key: 'actions',
+                width: 140,
+                render: (_, record) => {
+                  const targetStartup = (allStartups || []).find(
+                    s => s.name && s.name.toLowerCase() === (record.startupName || '').toLowerCase()
+                  );
+                  if (!targetStartup) return null;
+                  
+                  const status = (targetStartup.status || '').toLowerCase();
+                  if (status === 'approved') {
+                    return (
+                      <Button 
+                        type="primary" 
+                        danger 
+                        icon={<CloseCircleOutlined />} 
+                        onClick={() => handleReview(targetStartup, 'rejected')}
+                        style={{ borderRadius: 6, height: 32, fontSize: 13, whiteSpace: 'nowrap' }}
+                      >
+                        Reject Startup
+                      </Button>
+                    );
+                  }
+                  return (
+                    <Text style={{ color: C.textSec, fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>
+                      {status}
+                    </Text>
+                  );
+                }
               }
             ]}
             pagination={{ pageSize: 10 }}
