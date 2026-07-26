@@ -868,15 +868,30 @@ export default function AdminDashboard() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  // Filter application queue based on search
-  const filteredQueue = allStartups.filter(startup => {
-    const query = searchQuery.toLowerCase();
-    return (
-      (startup.name || '').toLowerCase().includes(query) ||
-      (startup.category || '').toLowerCase().includes(query) ||
-      (startup.status || '').toLowerCase().includes(query)
-    );
-  });
+  // Filter application queue based on search and sort processed (approved & rejected) startups to the top
+  const filteredQueue = (allStartups || [])
+    .filter(startup => {
+      if (!startup) return false;
+      const query = searchQuery.toLowerCase();
+      return (
+        (startup.name || '').toLowerCase().includes(query) ||
+        (startup.category || '').toLowerCase().includes(query) ||
+        (startup.status || '').toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      const getPriority = (status) => {
+        if (status === 'approved' || status === 'rejected') return 1; // Processed & rejected on top
+        return 2; // Pending below
+      };
+      const prioA = getPriority(a.status);
+      const prioB = getPriority(b.status);
+      if (prioA !== prioB) return prioA - prioB;
+      
+      const dateA = new Date(a.createdAt || 0).getTime();
+      const dateB = new Date(b.createdAt || 0).getTime();
+      return dateB - dateA;
+    });
 
   const columns = [
     {
@@ -970,17 +985,22 @@ export default function AdminDashboard() {
     {
       title: 'ACTIONS',
       key: 'actions',
+      width: 140,
       render: (_, record) => {
         if (record.status !== 'pending') {
-          return <Text style={{ color: '#9ca3af', fontWeight: 600, fontSize: 13 }}>Processed</Text>;
+          return (
+            <Text style={{ color: '#9ca3af', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', display: 'inline-block' }}>
+              Processed
+            </Text>
+          );
         }
         return (
-          <Space size="small">
+          <Space size="small" style={{ whiteSpace: 'nowrap' }}>
             <Button 
               type="primary" 
               icon={<CheckCircleOutlined />} 
               onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'approved'); }}
-              style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6, height: 32, fontSize: 13 }}
+              style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6, height: 32, fontSize: 13, whiteSpace: 'nowrap' }}
             >
               Approve
             </Button>
@@ -989,7 +1009,7 @@ export default function AdminDashboard() {
               danger 
               icon={<CloseCircleOutlined />} 
               onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'rejected'); }}
-              style={{ borderRadius: 6, height: 32, fontSize: 13 }}
+              style={{ borderRadius: 6, height: 32, fontSize: 13, whiteSpace: 'nowrap' }}
             >
               Reject
             </Button>
