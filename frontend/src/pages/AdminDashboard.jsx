@@ -704,7 +704,7 @@ export default function AdminDashboard() {
     { label: '1 hour', value: 60 },
   ];
 
-  const handleReview = async (item, decision) => {
+  const handleReview = async (item, decision, customReason = '') => {
     let startupId = item;
     if (typeof item === 'object' && item !== null) {
       startupId = item._id || item.id || item.key;
@@ -763,11 +763,13 @@ export default function AdminDashboard() {
       }
     };
 
-    if (decision === 'rejected') {
-      let reason = '';
+    if (decision === 'approved') {
+      await executeReview(startupId, 'approved');
+    } else if (decision === 'rejected') {
+      let reason = customReason || '';
       Modal.confirm({
         title: 'Reject Startup Application',
-        zIndex: 2000,
+        zIndex: 3000,
         icon: <ExclamationCircleOutlined style={{ color: '#eb5757' }} />,
         content: (
           <div style={{ marginTop: 10 }}>
@@ -783,24 +785,7 @@ export default function AdminDashboard() {
         okType: 'danger',
         cancelText: 'Cancel',
         onOk: async () => {
-          if (!reason || !reason.trim()) {
-            message.error('Rejection reason is required');
-            return Promise.reject();
-          }
-          await executeReview(startupId, 'rejected', reason);
-        }
-      });
-    } else {
-      Modal.confirm({
-        title: 'Approve Startup Application',
-        zIndex: 2000,
-        icon: <CheckCircleOutlined style={{ color: '#00d09c' }} />,
-        content: 'Are you sure you want to approve this company for the investment marketplace?',
-        okText: 'Approve',
-        okType: 'primary',
-        cancelText: 'Cancel',
-        onOk: async () => {
-          await executeReview(startupId, 'approved');
+          await executeReview(startupId, 'rejected', reason || 'Requirements not met.');
         }
       });
     }
@@ -985,7 +970,7 @@ export default function AdminDashboard() {
             <Button 
               type="primary" 
               icon={<CheckCircleOutlined />} 
-              onClick={() => handleReview(record, 'approved')}
+              onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'approved'); }}
               style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6, height: 32, fontSize: 13 }}
             >
               Approve
@@ -994,7 +979,7 @@ export default function AdminDashboard() {
               type="primary" 
               danger 
               icon={<CloseCircleOutlined />} 
-              onClick={() => handleReview(record, 'rejected')}
+              onClick={(e) => { e?.stopPropagation?.(); handleReview(record, 'rejected'); }}
               style={{ borderRadius: 6, height: 32, fontSize: 13 }}
             >
               Reject
@@ -2085,7 +2070,7 @@ export default function AdminDashboard() {
                   <Button 
                     type="primary" 
                     icon={<CheckCircleOutlined />} 
-                    onClick={() => handleReview(detailStartup, 'approved')}
+                    onClick={(e) => { e?.stopPropagation?.(); handleReview(detailStartup, 'approved'); }}
                     style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 8, height: 38 }}
                   >
                     Approve Application
@@ -2094,7 +2079,7 @@ export default function AdminDashboard() {
                     type="primary" 
                     danger 
                     icon={<CloseCircleOutlined />} 
-                    onClick={() => handleReview(detailStartup, 'rejected')}
+                    onClick={(e) => { e?.stopPropagation?.(); handleReview(detailStartup, 'rejected'); }}
                     style={{ borderRadius: 8, height: 38 }}
                   >
                     Reject Application
