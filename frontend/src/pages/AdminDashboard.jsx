@@ -441,6 +441,14 @@ function AnalyticsDonutChart({ data, isDarkMode, C }) {
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    message.info('Session ended. You have been logged out.');
+    navigate('/login');
+  }, [navigate]);
+
   const [allStartups, setAllStartups] = useState([]);
   const [pendingStartups, setPendingStartups] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -681,13 +689,6 @@ export default function AdminDashboard() {
       fetchAnalyticsData();
     }
   }, [activeMenu, fetchAnalyticsData]);
-
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    message.info('Session ended. You have been logged out.');
-    navigate('/login');
-  }, [navigate]);
 
   // ── Idle Timeout ──────────────────────────────────────────────
   const { warningVisible, secondsLeft, resetTimer } = useIdleTimeout(handleLogout);

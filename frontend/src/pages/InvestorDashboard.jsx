@@ -220,6 +220,14 @@ function ValuationSparkline({ data, projectionCount = 0 }) {
 
 export default function InvestorDashboard() {
   const navigate = useNavigate();
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    message.info('Session ended. You have been logged out.');
+    navigate('/login');
+  }, [navigate]);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [startups, setStartups] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -912,18 +920,11 @@ export default function InvestorDashboard() {
     } catch (err) {
       message.error('Failed to load dashboard data');
     }
-  }, [navigate]);
+  }, [navigate, handleLogout]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleLogout = useCallback(() => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    message.info('Session ended. You have been logged out.');
-    navigate('/login');
-  }, [navigate]);
 
   // ── Idle Timeout ──────────────────────────────────────────────
   const { warningVisible, secondsLeft, resetTimer } = useIdleTimeout(handleLogout);

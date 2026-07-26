@@ -88,6 +88,14 @@ function ValuationGraph({ data }) {
 
 export default function CompanyDashboard() {
   const navigate = useNavigate();
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    message.success('Logged out successfully');
+    navigate('/login');
+  }, [navigate]);
+
   const [currentUser, setCurrentUser] = useState(null);
   const [startup, setStartup] = useState(null);
   const [investments, setInvestments] = useState([]);
@@ -153,18 +161,11 @@ export default function CompanyDashboard() {
     } catch (err) {
       message.error(err.message || 'Failed to load dashboard data');
     }
-  }, [navigate]);
+  }, [navigate, handleLogout]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    message.success('Logged out successfully');
-    navigate('/login');
-  };
 
   const profileMenu = {
     items: [
