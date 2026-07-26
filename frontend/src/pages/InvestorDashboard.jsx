@@ -268,6 +268,125 @@ export default function InvestorDashboard() {
   const [updatesLoading, setUpdatesLoading] = useState(false);
   const [companyModalTab, setCompanyModalTab] = useState('overview'); // 'overview' | 'updates'
   const [questionText, setQuestionText] = useState('');
+
+  // Fetch approved deals
+  const fetchData = useCallback(async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+
+    try {
+      const startupRes = await fetch(`${API_URL}/api/startups`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (startupRes.status === 401) {
+        handleLogout();
+        return;
+      }
+      const startupData = await startupRes.json();
+      setStartups(startupData);
+
+      // Fetch live user info
+      const meRes = await fetch(`${API_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        localStorage.setItem('user', JSON.stringify(meData));
+        setCurrentUser(meData);
+      }
+
+      // Fetch live user investments
+      const myInvestmentsRes = await fetch(`${API_URL}/api/my`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (myInvestmentsRes.ok) {
+        const myInvestmentsData = await myInvestmentsRes.json();
+        const mappedInvestments = myInvestmentsData.map(inv => ({
+          key: inv._id,
+          startupId: inv.startupId?._id,
+          startupName: inv.startupId?.name || 'Unknown Startup',
+          amount: inv.amount,
+          timestamp: new Date(inv.timestamp || inv.createdAt).toLocaleString(),
+          rawDate: new Date(inv.timestamp || inv.createdAt),
+          startupObj: inv.startupId
+        }));
+        setMyInvestments(mappedInvestments);
+      }
+
+      // Fetch blogs/tips
+      const blogsRes = await fetch(`${API_URL}/api/blogs`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (blogsRes.ok) {
+        const blogsData = await blogsRes.json();
+        setBlogs(blogsData);
+      }
+
+      // Fetch live market news
+      setNewsLoading(true);
+      const newsRes = await fetch(`${API_URL}/api/blogs/market-news`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (newsRes.ok) {
+        const newsData = await newsRes.json();
+        setMarketNews(newsData);
+      }
+      setNewsLoading(false);
+
+      // Fetch baskets
+      setBasketsLoading(true);
+      try {
+        const basketsRes = await fetch(`${API_URL}/api/baskets`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (basketsRes.ok) {
+          const basketsData = await basketsRes.json();
+          setBaskets(basketsData);
+        }
+      } catch (err) {
+        console.error('Failed to load baskets:', err);
+      }
+      setBasketsLoading(false);
+
+      // Fetch wallet transactions
+      setLoadingTransactions(true);
+      try {
+        const txsRes = await fetch(`${API_URL}/api/wallet/transactions`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const txsCt = txsRes.headers.get('content-type') || '';
+        if (txsRes.ok && txsCt.includes('application/json')) {
+          const txsData = await txsRes.json();
+          setWalletTransactions(Array.isArray(txsData) ? txsData : []);
+        }
+      } catch (_) {
+        // Silently fail - transactions just won't show
+      }
+      setLoadingTransactions(false);
+
+      // Fetch watchlist
+      try {
+        const wlRes = await fetch(`${API_URL}/api/watchlist`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (wlRes.ok) {
+          const wlData = await wlRes.json();
+          setWatchlist(wlData.map(s => s._id || s));
+        }
+      } catch (err) {
+        console.error('Failed to load watchlist:', err);
+      }
+    } catch (err) {
+      message.error('Failed to load dashboard data');
+    }
+  }, [navigate, handleLogout]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
   const [submittingQuestion, setSubmittingQuestion] = useState(false);
 
   // Feature 2: Health Score details expansion
@@ -806,125 +925,6 @@ export default function InvestorDashboard() {
     }
   };
 
-
-  // Fetch approved deals
-  const fetchData = useCallback(async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
-
-    try {
-      const startupRes = await fetch(`${API_URL}/api/startups`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (startupRes.status === 401) {
-        handleLogout();
-        return;
-      }
-      const startupData = await startupRes.json();
-      setStartups(startupData);
-
-      // Fetch live user info
-      const meRes = await fetch(`${API_URL}/api/auth/me`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (meRes.ok) {
-        const meData = await meRes.json();
-        localStorage.setItem('user', JSON.stringify(meData));
-        setCurrentUser(meData);
-      }
-
-      // Fetch live user investments
-      const myInvestmentsRes = await fetch(`${API_URL}/api/my`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (myInvestmentsRes.ok) {
-        const myInvestmentsData = await myInvestmentsRes.json();
-        const mappedInvestments = myInvestmentsData.map(inv => ({
-          key: inv._id,
-          startupId: inv.startupId?._id,
-          startupName: inv.startupId?.name || 'Unknown Startup',
-          amount: inv.amount,
-          timestamp: new Date(inv.timestamp || inv.createdAt).toLocaleString(),
-          rawDate: new Date(inv.timestamp || inv.createdAt),
-          startupObj: inv.startupId
-        }));
-        setMyInvestments(mappedInvestments);
-      }
-
-      // Fetch blogs/tips
-      const blogsRes = await fetch(`${API_URL}/api/blogs`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (blogsRes.ok) {
-        const blogsData = await blogsRes.json();
-        setBlogs(blogsData);
-      }
-
-      // Fetch live market news
-      setNewsLoading(true);
-      const newsRes = await fetch(`${API_URL}/api/blogs/market-news`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (newsRes.ok) {
-        const newsData = await newsRes.json();
-        setMarketNews(newsData);
-      }
-      setNewsLoading(false);
-
-      // Fetch baskets
-      setBasketsLoading(true);
-      try {
-        const basketsRes = await fetch(`${API_URL}/api/baskets`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (basketsRes.ok) {
-          const basketsData = await basketsRes.json();
-          setBaskets(basketsData);
-        }
-      } catch (err) {
-        console.error('Failed to load baskets:', err);
-      }
-      setBasketsLoading(false);
-
-      // Fetch wallet transactions
-      setLoadingTransactions(true);
-      try {
-        const txsRes = await fetch(`${API_URL}/api/wallet/transactions`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const txsCt = txsRes.headers.get('content-type') || '';
-        if (txsRes.ok && txsCt.includes('application/json')) {
-          const txsData = await txsRes.json();
-          setWalletTransactions(Array.isArray(txsData) ? txsData : []);
-        }
-      } catch (_) {
-        // Silently fail - transactions just won't show
-      }
-      setLoadingTransactions(false);
-
-      // Fetch watchlist
-      try {
-        const wlRes = await fetch(`${API_URL}/api/watchlist`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (wlRes.ok) {
-          const wlData = await wlRes.json();
-          setWatchlist(wlData.map(s => s._id || s));
-        }
-      } catch (err) {
-        console.error('Failed to load watchlist:', err);
-      }
-    } catch (err) {
-      message.error('Failed to load dashboard data');
-    }
-  }, [navigate, handleLogout]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
 
   // ── Idle Timeout ──────────────────────────────────────────────
   const { warningVisible, secondsLeft, resetTimer } = useIdleTimeout(handleLogout);
