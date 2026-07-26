@@ -868,7 +868,7 @@ export default function AdminDashboard() {
     return name.slice(0, 2).toUpperCase();
   };
 
-  // Filter application queue based on search and sort processed (approved & rejected) startups to the top
+  // Filter application queue based on search and sort pending startups to the top
   const filteredQueue = (allStartups || [])
     .filter(startup => {
       if (!startup) return false;
@@ -882,8 +882,8 @@ export default function AdminDashboard() {
     .sort((a, b) => {
       const getPriority = (statusVal) => {
         const s = (statusVal || '').toLowerCase();
-        if (s === 'approved' || s === 'rejected' || s === 'processed') return 1; // Processed & rejected on top
-        return 2; // Pending below
+        if (s === 'pending') return 1; // Pending startups on top
+        return 2; // Processed (approved/rejected) below
       };
       const prioA = getPriority(a.status);
       const prioB = getPriority(b.status);
