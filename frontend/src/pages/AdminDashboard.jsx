@@ -704,9 +704,41 @@ export default function AdminDashboard() {
     { label: '1 hour', value: 60 },
   ];
 
-  const handleReview = async (id, decision) => {
-    const startupId = typeof id === 'object' ? (id?._id || id?.id) : id;
+  const handleReview = async (item, decision) => {
+    let startupId = item;
+    if (typeof item === 'object' && item !== null) {
+      startupId = item._id || item.id || item.key;
+    }
+    if (!startupId) {
+      message.error('Invalid startup ID');
+      return;
+    }
+
     const executeReview = async (sId, status, rejectionReason = '') => {
+      // Optimistic state updates for immediate visual feedback
+      setAllStartups(prev => prev.map(s => {
+        const itemId = s._id || s.id || s.key;
+        if (String(itemId) === String(sId)) {
+          return { ...s, status, rejectionReason };
+        }
+        return s;
+      }));
+
+      setPendingStartups(prev => prev.filter(s => {
+        const itemId = s._id || s.id || s.key;
+        return String(itemId) !== String(sId);
+      }));
+
+      if (selectedStartupDetails && selectedStartupDetails.startup) {
+        const curId = selectedStartupDetails.startup._id || selectedStartupDetails.startup.id || selectedStartupDetails.startup.key;
+        if (String(curId) === String(sId)) {
+          setSelectedStartupDetails(prev => ({
+            ...prev,
+            startup: { ...prev.startup, status, rejectionReason }
+          }));
+        }
+      }
+
       const token = localStorage.getItem('token');
       try {
         const res = await fetch(`${API_URL}/api/admin/startups/${sId}`, {
@@ -724,16 +756,10 @@ export default function AdminDashboard() {
         }
 
         message.success(`Venture application successfully ${status}!`);
-        // Update local detailed view if active
-        if (selectedStartupDetails && selectedStartupDetails.startup && (selectedStartupDetails.startup._id === sId || selectedStartupDetails.startup.id === sId)) {
-          setSelectedStartupDetails(prev => ({
-            ...prev,
-            startup: { ...prev.startup, status, rejectionReason }
-          }));
-        }
         await fetchAllData();
       } catch (err) {
         message.error(err.message || 'Failed to update status');
+        await fetchAllData();
       }
     };
 
@@ -741,6 +767,7 @@ export default function AdminDashboard() {
       let reason = '';
       Modal.confirm({
         title: 'Reject Startup Application',
+        zIndex: 2000,
         icon: <ExclamationCircleOutlined style={{ color: '#eb5757' }} />,
         content: (
           <div style={{ marginTop: 10 }}>
@@ -766,6 +793,7 @@ export default function AdminDashboard() {
     } else {
       Modal.confirm({
         title: 'Approve Startup Application',
+        zIndex: 2000,
         icon: <CheckCircleOutlined style={{ color: '#00d09c' }} />,
         content: 'Are you sure you want to approve this company for the investment marketplace?',
         okText: 'Approve',
@@ -957,7 +985,7 @@ export default function AdminDashboard() {
             <Button 
               type="primary" 
               icon={<CheckCircleOutlined />} 
-              onClick={() => handleReview(record._id, 'approved')}
+              onClick={() => handleReview(record, 'approved')}
               style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 6, height: 32, fontSize: 13 }}
             >
               Approve
@@ -966,7 +994,7 @@ export default function AdminDashboard() {
               type="primary" 
               danger 
               icon={<CloseCircleOutlined />} 
-              onClick={() => handleReview(record._id, 'rejected')}
+              onClick={() => handleReview(record, 'rejected')}
               style={{ borderRadius: 6, height: 32, fontSize: 13 }}
             >
               Reject
@@ -2057,7 +2085,7 @@ export default function AdminDashboard() {
                   <Button 
                     type="primary" 
                     icon={<CheckCircleOutlined />} 
-                    onClick={() => handleReview(detailStartup._id, 'approved')}
+                    onClick={() => handleReview(detailStartup, 'approved')}
                     style={{ backgroundColor: '#00d09c', borderColor: '#00d09c', borderRadius: 8, height: 38 }}
                   >
                     Approve Application
@@ -2066,7 +2094,7 @@ export default function AdminDashboard() {
                     type="primary" 
                     danger 
                     icon={<CloseCircleOutlined />} 
-                    onClick={() => handleReview(detailStartup._id, 'rejected')}
+                    onClick={() => handleReview(detailStartup, 'rejected')}
                     style={{ borderRadius: 8, height: 38 }}
                   >
                     Reject Application
