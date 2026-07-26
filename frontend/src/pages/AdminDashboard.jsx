@@ -563,16 +563,22 @@ export default function AdminDashboard() {
         return;
       }
       const dataPending = await resPending.json();
-      setPendingStartups((dataPending || []).map(item => ({ ...item, key: item._id })));
+      setPendingStartups((dataPending || []).map(item => ({ ...item, key: item._id || item.id })));
 
-      // 2. Fetch approved
-      const resApproved = await fetch(`${API_URL}/api/startups`, {
+      // 2. Fetch all startups (pending, approved, rejected)
+      const resAll = await fetch(`${API_URL}/api/admin/startups`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const dataApproved = await resApproved.json();
-
-      // Combine both for metrics calculations
-      setAllStartups([...(dataPending || []), ...(dataApproved || [])]);
+      if (resAll.ok) {
+        const dataAll = await resAll.json();
+        setAllStartups((dataAll || []).map(item => ({ ...item, key: item._id || item.id })));
+      } else {
+        const resApproved = await fetch(`${API_URL}/api/startups`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const dataApproved = await resApproved.json();
+        setAllStartups([...(dataPending || []), ...(dataApproved || [])].map(item => ({ ...item, key: item._id || item.id })));
+      }
 
       // 3. Fetch blogs
       const resBlogs = await fetch(`${API_URL}/api/blogs`, {
@@ -662,10 +668,11 @@ export default function AdminDashboard() {
   ];
 
   const handleReview = async (id, decision) => {
-    const executeReview = async (startupId, status, rejectionReason = '') => {
+    const startupId = typeof id === 'object' ? (id?._id || id?.id) : id;
+    const executeReview = async (sId, status, rejectionReason = '') => {
       const token = localStorage.getItem('token');
       try {
-        const res = await fetch(`${API_URL}/api/admin/startups/${startupId}`, {
+        const res = await fetch(`${API_URL}/api/admin/startups/${sId}`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
@@ -681,15 +688,15 @@ export default function AdminDashboard() {
 
         message.success(`Venture application successfully ${status}!`);
         // Update local detailed view if active
-        if (selectedStartupDetails && selectedStartupDetails.startup && selectedStartupDetails.startup._id === startupId) {
+        if (selectedStartupDetails && selectedStartupDetails.startup && (selectedStartupDetails.startup._id === sId || selectedStartupDetails.startup.id === sId)) {
           setSelectedStartupDetails(prev => ({
             ...prev,
             startup: { ...prev.startup, status, rejectionReason }
           }));
         }
-        fetchAllData();
+        await fetchAllData();
       } catch (err) {
-        message.error(err.message);
+        message.error(err.message || 'Failed to update status');
       }
     };
 
@@ -716,7 +723,7 @@ export default function AdminDashboard() {
             message.error('Rejection reason is required');
             return Promise.reject();
           }
-          await executeReview(id, 'rejected', reason);
+          await executeReview(startupId, 'rejected', reason);
         }
       });
     } else {
@@ -728,20 +735,21 @@ export default function AdminDashboard() {
         okType: 'primary',
         cancelText: 'Cancel',
         onOk: async () => {
-          await executeReview(id, 'approved');
+          await executeReview(startupId, 'approved');
         }
       });
     }
   };
 
   const handleOpenDetails = async (record) => {
-    if (!record || !record._id) return;
+    const targetId = record?._id || record?.id;
+    if (!targetId) return;
     setLoadingDetails(true);
     setDetailModalVisible(true);
     setSelectedStartupDetails(null);
     const token = localStorage.getItem('token');
     try {
-      const res = await fetch(`${API_URL}/api/admin/startups/${record._id}/details`, {
+      const res = await fetch(`${API_URL}/api/admin/startups/${targetId}/details`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to load startup details');
@@ -1686,7 +1694,20 @@ export default function AdminDashboard() {
     <Layout style={{ minHeight: '100vh', backgroundColor: isDarkMode ? '#0b0f19' : '#f8fafc' }}>
       
       {/* Left Sidebar Navigation matching screenshot */}
-      <Sider width={260} style={{ background: isDarkMode ? '#111827' : '#ffffff', borderRight: `1px solid ${isDarkMode ? '#1f2937' : '#e5e7eb'}` }}>
+      <Sider 
+        width={260} 
+        style={{ 
+          background: isDarkMode ? '#111827' : '#ffffff', 
+          borderRight: `1px solid ${isDarkMode ? '#1f2937' : '#e5e7eb'}`,
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          height: '100vh',
+          zIndex: 100,
+          overflowY: 'auto'
+        }}
+      >
         <div style={{ padding: '24px 20px', borderBottom: `1px solid ${isDarkMode ? '#1f2937' : '#f1f5f9'}` }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
             <div style={{
@@ -1773,7 +1794,7 @@ export default function AdminDashboard() {
       </Sider>
 
       {/* Main Area */}
-      <Layout style={{ background: 'transparent' }}>
+      <Layout style={{ marginLeft: 260, background: 'transparent', minHeight: '100vh' }}>
         <Content style={{ padding: '40px 48px' }} className="fade-in-section">
           
           {/* Header Row */}

@@ -3,6 +3,16 @@ const router = express.Router();
 const Startup = require('../models/startup');
 const { verifyToken, isAdmin } = require('../middleware/auth');
 
+// GET All Startups for Admin (pending, approved, rejected)
+router.get('/startups', verifyToken, isAdmin, async (req, res) => {
+  try {
+    const startups = await Startup.find({});
+    res.status(200).json(startups);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // GET Pending Startups
 router.get('/startups/pending', verifyToken, isAdmin, async (req, res) => {
   try {

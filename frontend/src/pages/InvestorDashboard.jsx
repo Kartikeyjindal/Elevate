@@ -1526,7 +1526,7 @@ export default function InvestorDashboard() {
   const getSectorExposureData = () => {
     const allocations = {};
     myInvestments.forEach(inv => {
-      const startup = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+      const startup = startups.find(s => String(s._id) === String(inv.startupId) || s.name === inv.startupName);
       const cat = startup ? startup.category : 'General';
       allocations[cat] = (allocations[cat] || 0) + inv.amount;
     });
@@ -1564,7 +1564,7 @@ export default function InvestorDashboard() {
     
     const categories = {};
     myInvestments.forEach(inv => {
-      const startup = startups.find(s => s._id === inv.startupId || s.name === inv.startupName);
+      const startup = startups.find(s => String(s._id) === String(inv.startupId) || s.name === inv.startupName);
       const cat = startup ? startup.category : 'General';
       if (!categories[cat]) {
         categories[cat] = {
@@ -1721,7 +1721,10 @@ export default function InvestorDashboard() {
     const tips = [];
 
     // 1. Diversification
-    const sectors = new Set(myInvestments.map(inv => inv.startupId?.category || inv.startupName));
+    const sectors = new Set(myInvestments.map(inv => {
+      const startup = startups.find(s => String(s._id) === String(inv.startupId) || s.name === inv.startupName);
+      return (startup?.category) || (inv.startupObj?.category) || inv.startupName;
+    }));
     diversificationScore = Math.min(30, sectors.size * 10);
     if (sectors.size < 3) {
       tips.push(`Diversification opportunity: You are invested in ${sectors.size} sector${sectors.size === 1 ? '' : 's'}. Spread your risk by investing in at least 3 distinct sectors.`);
@@ -1799,7 +1802,7 @@ export default function InvestorDashboard() {
       },
       tips
     };
-  }, [myInvestments, totalInvestedMyPortfolio, trajectoryData]);
+  }, [myInvestments, totalInvestedMyPortfolio, trajectoryData, startups]);
 
   // Group investments by company to combine duplicates
   const groupedHoldings = React.useMemo(() => {
