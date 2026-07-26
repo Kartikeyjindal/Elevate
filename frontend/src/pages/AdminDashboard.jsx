@@ -553,57 +553,94 @@ export default function AdminDashboard() {
       return;
     }
 
+    const headers = { 'Authorization': `Bearer ${token}` };
+
+    // 1. Fetch pending startups
+    let pendingList = [];
     try {
-      // 1. Fetch pending
-      const resPending = await fetch(`${API_URL}/api/admin/startups/pending`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const resPending = await fetch(`${API_URL}/api/admin/startups/pending`, { headers });
       if (resPending.status === 401 || resPending.status === 403) {
         handleLogout();
         return;
       }
-      const dataPending = await resPending.json();
-      setPendingStartups((dataPending || []).map(item => ({ ...item, key: item._id || item.id })));
+      if (resPending.ok) {
+        const dataPending = await resPending.json();
+        if (Array.isArray(dataPending)) {
+          pendingList = dataPending;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load pending startups:', err);
+    }
+    setPendingStartups(pendingList.map(item => ({ ...item, key: item._id || item.id })));
 
-      // 2. Fetch all startups (pending, approved, rejected)
-      const resAll = await fetch(`${API_URL}/api/admin/startups`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+    // 2. Fetch approved startups
+    let approvedList = [];
+    try {
+      const resApproved = await fetch(`${API_URL}/api/startups`, { headers });
+      if (resApproved.ok) {
+        const dataApproved = await resApproved.json();
+        if (Array.isArray(dataApproved)) {
+          approvedList = dataApproved;
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load approved startups:', err);
+    }
+
+    // 3. Fetch admin all startups (pending, approved, rejected)
+    let adminAllList = [];
+    try {
+      const resAll = await fetch(`${API_URL}/api/admin/startups`, { headers });
       if (resAll.ok) {
         const dataAll = await resAll.json();
-        setAllStartups((dataAll || []).map(item => ({ ...item, key: item._id || item.id })));
-      } else {
-        const resApproved = await fetch(`${API_URL}/api/startups`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const dataApproved = await resApproved.json();
-        setAllStartups([...(dataPending || []), ...(dataApproved || [])].map(item => ({ ...item, key: item._id || item.id })));
+        if (Array.isArray(dataAll)) {
+          adminAllList = dataAll;
+        }
       }
+    } catch (err) {
+      console.error('Failed to load all admin startups:', err);
+    }
 
-      // 3. Fetch blogs
-      const resBlogs = await fetch(`${API_URL}/api/blogs`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+    // Combine lists safely, ensuring all startups are shown
+    const combined = adminAllList.length > 0 ? adminAllList : [...pendingList, ...approvedList];
+    const uniqueMap = new Map();
+    combined.forEach(item => {
+      const idKey = item._id || item.id;
+      if (idKey && !uniqueMap.has(idKey)) {
+        uniqueMap.set(idKey, { ...item, key: idKey });
+      }
+    });
+    setAllStartups(Array.from(uniqueMap.values()));
+
+    // 4. Fetch blogs
+    try {
+      const resBlogs = await fetch(`${API_URL}/api/blogs`, { headers });
       if (resBlogs.ok) {
         const dataBlogs = await resBlogs.json();
-        setBlogs(dataBlogs || []);
+        if (Array.isArray(dataBlogs)) {
+          setBlogs(dataBlogs);
+        }
       }
+    } catch (err) {
+      console.error('Failed to load blogs:', err);
+    }
 
-      // 4. Fetch audit logs
-      const resLogs = await fetch(`${API_URL}/api/admin/audit-logs`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+    // 5. Fetch audit logs
+    try {
+      const resLogs = await fetch(`${API_URL}/api/admin/audit-logs`, { headers });
       if (resLogs.ok) {
         const dataLogs = await resLogs.json();
-        setAuditLogs(dataLogs || []);
+        if (Array.isArray(dataLogs)) {
+          setAuditLogs(dataLogs);
+        }
       }
-
     } catch (err) {
-      message.error('Failed to load vetting data');
-    } finally {
-      setLoading(false);
+      console.error('Failed to load audit logs:', err);
     }
-  }, [navigate]);
+
+    setLoading(false);
+  }, [navigate, handleLogout]);
 
   useEffect(() => {
     fetchAllData();
