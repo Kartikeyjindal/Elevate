@@ -880,8 +880,9 @@ export default function AdminDashboard() {
       );
     })
     .sort((a, b) => {
-      const getPriority = (status) => {
-        if (status === 'approved' || status === 'rejected') return 1; // Processed & rejected on top
+      const getPriority = (statusVal) => {
+        const s = (statusVal || '').toLowerCase();
+        if (s === 'approved' || s === 'rejected' || s === 'processed') return 1; // Processed & rejected on top
         return 2; // Pending below
       };
       const prioA = getPriority(a.status);
@@ -964,7 +965,8 @@ export default function AdminDashboard() {
       title: 'STATUS',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => {
+      render: (statusVal) => {
+        const status = (statusVal || 'pending').toLowerCase();
         const isPending = status === 'pending';
         const isRejected = status === 'rejected';
         return (
@@ -987,7 +989,8 @@ export default function AdminDashboard() {
       key: 'actions',
       width: 140,
       render: (_, record) => {
-        if (record.status !== 'pending') {
+        const status = (record?.status || 'pending').toLowerCase();
+        if (status !== 'pending') {
           return (
             <Text style={{ color: '#9ca3af', fontWeight: 600, fontSize: 13, whiteSpace: 'nowrap', display: 'inline-block' }}>
               Processed
